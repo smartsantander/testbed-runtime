@@ -53,6 +53,8 @@ public class DeviceFactory {
 			return new NullDevice();
 		} else if ("mock".equals(type)) {
 			return new MockDevice(port);
+		} else if ("trisos".equals(type)) {
+			return new MockDevice(port);
 		}
 
 		throw new Exception("Unknown type " + type);
