@@ -30,6 +30,7 @@ import de.uniluebeck.itm.wsn.devicedrivers.mockdevice.MockDevice;
 import de.uniluebeck.itm.wsn.devicedrivers.nulldevice.NullDevice;
 import de.uniluebeck.itm.wsn.devicedrivers.pacemate.PacemateDevice;
 import de.uniluebeck.itm.wsn.devicedrivers.telosb.TelosbDevice;
+import de.uniluebeck.itm.wsn.devicedrivers.trisos.TrisosDevice;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,7 +55,7 @@ public class DeviceFactory {
 		} else if ("mock".equals(type)) {
 			return new MockDevice(port);
 		} else if ("trisos".equals(type)) {
-			return new MockDevice(port);
+			return new TrisosDevice(port);
 		}
 
 		throw new Exception("Unknown type " + type);
