@@ -45,35 +45,35 @@
 			<application name="WSNDeviceApp" factoryclass="de.uniluebeck.itm.tr.runtime.wsnapp.WSNDeviceAppFactory">
 				<ns4:device xmlns:ns4="http://itm.uniluebeck.de/tr/runtime/wsnapp/xml">
 					<urn>urn:local-logcontroller:0x0001</urn>
-					<type>mock</type>
+					<type>trisos</type>
 					<serialinterface>urn:local-logcontroller:0x0001,60,SECONDS</serialinterface>
 				</ns4:device>
 			</application>
 			<application name="WSNDeviceApp" factoryclass="de.uniluebeck.itm.tr.runtime.wsnapp.WSNDeviceAppFactory">
 				<ns4:device xmlns:ns4="http://itm.uniluebeck.de/tr/runtime/wsnapp/xml">
 					<urn>urn:local-logcontroller:0x0002</urn>
-					<type>mock</type>
+					<type>trisos</type>
 					<serialinterface>urn:local-logcontroller:0x0002,60,SECONDS</serialinterface>
 				</ns4:device>
 			</application>
 			<application name="WSNDeviceApp" factoryclass="de.uniluebeck.itm.tr.runtime.wsnapp.WSNDeviceAppFactory">
 				<ns4:device xmlns:ns4="http://itm.uniluebeck.de/tr/runtime/wsnapp/xml">
 					<urn>urn:local-logcontroller:0x0003</urn>
-					<type>mock</type>
+					<type>trisos</type>
 					<serialinterface>urn:local-logcontroller:0x0002,60,SECONDS</serialinterface>
 				</ns4:device>
 			</application>
 			<application name="WSNDeviceApp" factoryclass="de.uniluebeck.itm.tr.runtime.wsnapp.WSNDeviceAppFactory">
 				<ns4:device xmlns:ns4="http://itm.uniluebeck.de/tr/runtime/wsnapp/xml">
 					<urn>urn:local-logcontroller:0x0004</urn>
-					<type>mock</type>
+					<type>trisos</type>
 					<serialinterface>urn:local-logcontroller:0x0004,60,SECONDS</serialinterface>
 				</ns4:device>
 			</application>
 			<application name="WSNDeviceApp" factoryclass="de.uniluebeck.itm.tr.runtime.wsnapp.WSNDeviceAppFactory">
 				<ns4:device xmlns:ns4="http://itm.uniluebeck.de/tr/runtime/wsnapp/xml">
 					<urn>urn:local-logcontroller:0x0005</urn>
-					<type>mock</type>
+					<type>trisos</type>
 					<serialinterface>urn:local-logcontroller:0x0005,60,SECONDS</serialinterface>
 				</ns4:device>
 			</application>

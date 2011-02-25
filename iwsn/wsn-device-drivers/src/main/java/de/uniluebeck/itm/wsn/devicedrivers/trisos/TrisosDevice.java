@@ -23,282 +23,201 @@
 
 package de.uniluebeck.itm.wsn.devicedrivers.trisos;
 
-import de.uniluebeck.itm.wsn.devicedrivers.exceptions.*;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import de.uniluebeck.itm.tr.util.StringUtils;
 import de.uniluebeck.itm.wsn.devicedrivers.generic.*;
 import de.uniluebeck.itm.wsn.devicedrivers.jennic.FlashType;
 import de.uniluebeck.itm.wsn.devicedrivers.jennic.Sectors;
-import gnu.io.*;
-import java.io.*;
-import java.util.*;
-import java.util.logging.Level;
+import org.joda.time.DateTime;
+import org.joda.time.Interval;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Random;
+import java.util.concurrent.*;
 
-public class TrisosDevice extends iSenseDeviceImpl implements
-		SerialPortEventListener {
+import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkNotNull;
+import static java.lang.Thread.sleep;
 
-	private static final Logger log = LoggerFactory
-			.getLogger(TrisosDevice.class);
 
-	@Override
-	public void serialEvent(SerialPortEvent event) {
-		switch (event.getEventType()) {
-			case SerialPortEvent.DATA_AVAILABLE:
+public class TrisosDevice extends iSenseDeviceImpl {
+	public static final int MESSAGE_TYPE_WISELIB_DOWNSTREAM = 10;
 
-//                                synchronized (bsl.dataAvailableMonitor) {
-//					bsl.dataAvailableMonitor.notifyAll();
-//				}
-				if (operation == null) {
-					receive(inputStream);
-				}
-				break;
-			default:
-				logDebug("Serial event (other than data available): " + event);
-				break;
-		}
-	}
+	public static final int MESSAGE_TYPE_WISELIB_UPSTREAM = 105;
 
-	/** */
-	private enum ComPortMode {
+	public static final byte MESSAGE_TYPE_MOCK_DEVICE_PING = (byte) 0xFF;
 
-		Normal, Program
-	}
+	public static final byte NODE_API_VL_MESSAGE = 11;
 
-	;
-
-	// iSenseTelos true = Telos node with iSense Os and uart messages with type
-	// false = no packet type everything as plain text message
-	// private boolean iSenseTelos = true;
-//TODO rename
-	private final int BSL_DATABITS = SerialPort.DATABITS_8;
-
-	private final int BSL_STOPBITS = SerialPort.STOPBITS_1;
-
-//	private final int BSL_PARITY_EVEN = SerialPort.PARITY_EVEN;
-
-	private final int BSL_PARITY_NONE = SerialPort.PARITY_NONE;
-
-	private final int MAX_OPEN_PORT_RETRIES = 10;
-
-	/*
-	 * initial baud rate for communicating over the serial port, can can only be
-	 * changed temporarily later on via bsl command
-	 */
-
-	private final int READ_BAUDRATE = 115200;
-
-	private final int FLASH_BAUDRATE = 9600;
-
-	/* time out for opening a serial port */
-
-	private final int PORTOPEN_TIMEOUTMS = 1000;
-
-	/**
-	 * Strings for saving device state in a memento
-	 */
-	public static final String MEM_PORT = "Port";
-
-	private String serialPortName = "";
-
-	private SerialPort serialPort = null;
-
-	private InputStream inputStream = null;
-
-	private OutputStream outputStream = null;
-
-//	private BSLTelosb bsl = null;
-
-	private boolean connected;
-
-	//private boolean verify = true;
-
-	/**
-	 * @param serialPortName
-	 */
-	public TrisosDevice(String serialPortName) {
-		this.serialPortName = serialPortName;
-		connected = false;
-		connect();
-	}
 	/**
 	 *
 	 */
-	public TrisosDevice() {
+	private String nodeName;
+
+	private List<Long> virtualLinks = new ArrayList<Long>();
+
+	private long nodeId;
+
+	private ScheduledFuture<?> virtualLinkRunnableFuture;
+
+	private class AliveRunnable implements Runnable {
+
+		private int i = 0;
+
+		private DateTime started;
+
+		private AliveRunnable() {
+			started = new DateTime();
+		}
+
+		@Override
+		public void run() {
+			DateTime now = new DateTime();
+			Interval interval = new Interval(started, now);
+			String msg = "TrisosDevice " + nodeName + " alive since " + interval.toDuration().getStandardSeconds() +
+					" seconds (update #" + (++i) + ")";
+			sendLogMessage(msg);
+			sendBinaryMessage((byte) 0x00, msg.getBytes());
+		}
+
 	}
 
-	private boolean connect() {
-		Enumeration allIdentifiers = null;
-		CommPortIdentifier portIdentifier = null;
-		CommPort commPort = null;
-		int tries = 0;
-		boolean portOpened = false;
-		boolean portFound = false;
+	private class VirtualLinkRunnable implements Runnable {
 
-		if (serialPort != null) {
-			connected = false;
-			return true;
+		private int i = 0;
+
+		private DateTime started;
+
+		private VirtualLinkRunnable() {
+			started = new DateTime();
 		}
 
-		if (serialPortName == null) {
-			connected = false;
-			return false;
-		}
-
-		allIdentifiers = CommPortIdentifier.getPortIdentifiers();
-		while (allIdentifiers.hasMoreElements() && !portFound) {
-			portIdentifier = (CommPortIdentifier) allIdentifiers.nextElement();
-			if (portIdentifier.getName().equals(serialPortName)) {
-				portFound = true;
-			}
-		}
-
-		if (!portFound) {
-			logDebug("Failed to connect to port '" + serialPortName
-					+ "': port does not exist."
+		@Override
+		public void run() {
+			DateTime now = new DateTime();
+			Interval interval = new Interval(started, now);
+			sendVirtualLinkMessage("TrisosDevice " + nodeName + " alive since " + interval.toDuration()
+					.getStandardSeconds() + " seconds (update #" + (++i) + ")"
 			);
-			connected = false;
-			return false;
 		}
 
-		// open port
-		while (tries < MAX_OPEN_PORT_RETRIES && !portOpened) {
-			try {
-				tries++;
-				commPort = portIdentifier.open(this.getClass().getName(),
-						PORTOPEN_TIMEOUTMS
+	}
+
+	/**
+	 *
+	 */
+	private Future<?> aliveRunnableFuture;
+
+	/**
+	 *
+	 */
+	private long aliveTimeout;
+
+	/**
+	 *
+	 */
+	private TimeUnit aliveTimeUnit;
+
+	/**
+	 *
+	 */
+	private boolean rebootAfterFlashing;
+
+	/**
+	 *
+	 */
+	private ScheduledExecutorService executorService =
+			Executors.newScheduledThreadPool(2, new ThreadFactoryBuilder().setNameFormat("TrisosDevice-Thread %d").build());
+
+	/**
+	 * Instantiates a new mock device with the given configuration.
+	 *
+	 * @param config a comma-separated String containing an int defining the timeout and a serialized {@link
+	 *               java.util.concurrent.TimeUnit} defining the time unit that is to be used for the timeout. The timeout
+	 *               value defines how often the mock device sends "alive"-messages.
+	 */
+	public TrisosDevice(String config) {
+
+		checkNotNull(config);
+
+		String[] strs = config.split(",");
+		checkArgument(strs.length == 3, "The port (serialinterface) value must contain three comma-separated values: "
+				+ "nodeName,aliveMessageTimeout,aliveMessageTimeUnit where aliveMessageTimeUnit is one of "
+				+ "NANOSECONDS,MICROSECONDS,MILLISECONDS,SECONDS,MINUTES,HOURS,DAYS."
+		);
+
+		this.nodeName = strs[0];
+		checkArgument(!"".equals(nodeName), "The value nodeName must not be empty!");
+
+		String[] nodeNameParts = nodeName.split(":");
+		try {
+			this.nodeId = StringUtils.parseHexOrDecLong(nodeNameParts[nodeNameParts.length - 1]);
+		} catch (NumberFormatException e) {
+			throw new IllegalArgumentException(
+					"The last part of the node URN must be a long value. Failed to parse it..."
+			);
+		}
+
+		this.aliveTimeout = Long.parseLong(strs[1]);
+		checkArgument(aliveTimeout > 0, "The value aliveMessageTimeout must be greater than zero (0)!");
+
+		this.aliveTimeUnit = TimeUnit.valueOf(strs[2]);
+
+		scheduleAliveRunnable();
+		scheduleVirtualLinkRunnable();
+
+	}
+
+	private void scheduleAliveRunnable() {
+		this.aliveRunnableFuture = this.executorService
+				.scheduleWithFixedDelay(new AliveRunnable(), new Random().nextInt((int) aliveTimeout), aliveTimeout,
+						aliveTimeUnit
 				);
-				portOpened = true;
-			} catch (PortInUseException e) {
-				if (tries < MAX_OPEN_PORT_RETRIES) {
-					logDebug("Port '" + serialPortName
-							+ "' is already in use, retrying to connect..."
-					);
-					portOpened = false;
-				} else {
-					logDebug("Port '" + serialPortName
-							+ "' is already in use, failed to connect."
-					);
-					connected = false;
-					return false;
-				}
-			}
+	}
+
+	private void scheduleVirtualLinkRunnable() {
+		this.virtualLinkRunnableFuture = this.executorService
+				.scheduleWithFixedDelay(new VirtualLinkRunnable(), new Random().nextInt((int) aliveTimeout),
+						aliveTimeout,
+						aliveTimeUnit
+				);
+	}
+
+	private void stopAliveRunnable() {
+		if (aliveRunnableFuture != null && !aliveRunnableFuture.isCancelled()) {
+			aliveRunnableFuture.cancel(true);
 		}
+	}
 
-		// cancel if opened port is no serial port
-		if (!(commPort instanceof SerialPort)) {
-			logDebug("Com Port '" + serialPortName
-					+ "' is no serial port, will not connect."
-			);
-			connected = false;
-			return false;
+	private void stopVirtualLinkRunnable() {
+		if (virtualLinkRunnableFuture != null && !virtualLinkRunnableFuture.isCancelled()) {
+			virtualLinkRunnableFuture.cancel(true);
 		}
+	}
 
-		serialPort = (SerialPort) commPort;
-		try {
-			serialPort.setSerialPortParams(READ_BAUDRATE, BSL_DATABITS,
-					BSL_STOPBITS, BSL_PARITY_NONE
-			);
-			serialPort.setFlowControlMode(SerialPort.FLOWCONTROL_NONE);
-		} catch (UnsupportedCommOperationException e) {
-			logError("Failed to connect to port '" + serialPortName + "'. "
-					+ e.getMessage(), e
-			);
-			connected = false;
-			return false;
-		}
-
-		serialPort.setRTS(true);
-		serialPort.setDTR(true);
-
-		try {
-			inputStream = serialPort.getInputStream();
-			outputStream = serialPort.getOutputStream();
-
-//			bsl = new BSLTelosb(serialPort);
-		} catch (IOException e) {
-			logError("Unable to get I/O streams of port " + serialPortName
-					+ ", failed to connect.", e
-			);
-			connected = false;
-			return false;
-		}
-
-		try {
-			serialPort.addEventListener(this);
-		} catch (TooManyListenersException e) {
-			logError("Unable to register as event listener for serial port "
-					+ serialPortName, e
-			);
-			connected = false;
-			return false;
-		}
-		serialPort.notifyOnDataAvailable(true);
-
-		logDebug("Device connected to serial port " + serialPort.getName());
-
-		connected = true;
+	@Override
+	public boolean enterProgrammingMode() throws Exception {
 		return true;
 	}
-	// -------------------------------------------------------------------------
 
-	/**
-	 *
-	 */
-	@Override
-	public boolean enterProgrammingMode() throws TimeoutException,
-			InvalidChecksumException, ReceivedIncorrectDataException,
-			IOException, FlashEraseFailedException,
-			UnexpectedResponseException, Exception {
-		if (log.isDebugEnabled()) {
-			logDebug("enterProgrammingMode()");
-		}
-		//this.setComPort(ComPortMode.Program);
-
-		//return startBSL();
-                return true; //TODO
-	}
-
-	// -------------------------------------------------------------------------
-
-	/**
-	 *
-	 */
 	@Override
 	public void eraseFlash() throws Exception {
-		logWarn("No device connection available (Ignoring action)");
-                //TODO erase flash via external tool call
+		// nothing to do
 	}
 
-	// -------------------------------------------------------------------------
-
-	/**
-	 *
-	 */
 	@Override
 	public ChipType getChipType() throws Exception {
 		return ChipType.Unknown;
-                //TODO return ChipType.Trisos;
 	}
 
-	// -------------------------------------------------------------------------
-
-	/**
-	 *
-	 */
 	@Override
 	public FlashType getFlashType() throws Exception {
 		return FlashType.Unknown;
-                //TODO
 	}
-
-	// -------------------------------------------------------------------------
-
-	/*
-	 * (non-Javadoc)
-	 *
-	 * @see ishell.device.iSenseDeviceImpl#getOperation()
-	 */
 
 	@Override
 	public Operation getOperation() {
@@ -309,261 +228,247 @@ public class TrisosDevice extends iSenseDeviceImpl implements
 		}
 	}
 
-	// -------------------------------------------------------------------------
-
-	/*
-	 * (non-Javadoc)
-	 *
-	 * @see ishell.device.iSenseDeviceImpl#leaveProgrammingMode()
-	 */
 	@Override
 	public void leaveProgrammingMode() throws Exception {
-		logWarn("No device connection available (Ignoring action)");
+		// nothing to do
 	}
 
-	// -------------------------------------------------------------------------
-
-	/**
-	 *
-	 */
 	@Override
 	public byte[] readFlash(int address, int len) throws Exception {
-		logWarn("No device connection available (Ignoring action)");
-                //TODO read flash with external programming tool and return
 		return new byte[]{};
 	}
 
-	// -------------------------------------------------------------------------
+	private class ResetRunnable implements Runnable {
 
-	/**
-	 *
-	 */
-	@Override
-	public boolean reset() throws Exception {
-		logWarn("No device connection available (Ignoring action)");
-                //TODO reset trisos node over jtag or com?
-		return false;
+		@Override
+		public void run() {
+			try {
+				sleep(200);
+				stopAliveRunnable();
+				stopVirtualLinkRunnable();
+				sleep(1000);
+				sendLogMessage("Booting TrisosDevice...");
+				sleep(100);
+				scheduleAliveRunnable();
+				scheduleVirtualLinkRunnable();
+			} catch (InterruptedException e) {
+				logError("" + e, e);
+			}
+
+		}
 	}
 
-	// -------------------------------------------------------------------------
+	@Override
+	public boolean reset() throws Exception {
+		executorService.submit(new ResetRunnable());
+		return true;
+	}
 
-/*
-	 * (non-Javadoc)
-	 *
-	 * @see ishell.device.iSenseDeviceImpl#send(ishell.device.MessagePacket)
-	 */
+	public final static byte NODE_API_SET_VIRTUAL_LINK = 30;
+
+	public final static byte NODE_API_DESTROY_VIRTUAL_LINK = 31;
 
 	@Override
 	public void send(MessagePacket p) throws Exception {
-		// TODO Auto-generated method stub
 
-		if (operationInProgress()) {
-			log
-					.error("Skipping packet. Another operation already in progress ("
-							+ operation.getClass().getName() + ")"
-					);
-			return;
-		}
+		// simulate WISELIB behaviour
+		if (p.getType() == MESSAGE_TYPE_WISELIB_DOWNSTREAM) {
 
-		byte type = (byte) (0xFF & p.getType());
-		byte b[] = p.getContent();
+			logDebug("Received WISELIB downstream message: {}", p);
 
-		boolean iSenseStyle = true;
+			byte[] payload = p.getContent();
+			ByteBuffer payloadBuff = ByteBuffer.wrap(p.getContent());
 
-		// if the type was set to 0 send the message without iSense framing to the node
-		// e.g. to Contiki or TinyOs Os
-		//if (type == 0x64)
-		//	iSenseStyle = false;
+			if (payload.length >= 2) {
 
-		if (b == null || type > 0xFF) {
-			log.warn("Skipping empty packet or type > 0xFF.");
-			return;
-		}
-		if (b.length > 150) {
-			log.warn("Skipping too large packet (length " + b.length + ")");
-			return;
-		}
+				byte messageType = payloadBuff.get(0);
+				byte requestId = payloadBuff.get(1);
+				long destinationNode = payloadBuff.getLong(2);
 
-		if (iSenseStyle == true){
-			// Send start signal DLE STX
-			this.outputStream.write(DLE_STX);
+				byte[] replyArr = new byte[3];
 
-			// Send the type escaped
-			outputStream.write(type);
-			if (type == DLE) {
-				outputStream.write(DLE);
-			}
+				if (messageType == NODE_API_DESTROY_VIRTUAL_LINK || messageType == NODE_API_SET_VIRTUAL_LINK || messageType == NODE_API_VL_MESSAGE) {
 
-			// Transmit each byte escaped
-			for (int i = 0; i < b.length; ++i) {
-				outputStream.write(b[i]);
-				if (b[i] == DLE) {
-					outputStream.write(DLE);
+					if (messageType == NODE_API_SET_VIRTUAL_LINK) {
+
+						replyArr[0] = NODE_API_SET_VIRTUAL_LINK;
+						logDebug("Adding virtual link to node ID {}", destinationNode);
+						virtualLinks.add(destinationNode);
+
+					} else if (messageType == NODE_API_DESTROY_VIRTUAL_LINK) {
+
+						replyArr[0] = NODE_API_DESTROY_VIRTUAL_LINK;
+						logDebug("Removing virtual link to node ID {}", destinationNode);
+						virtualLinks.remove(destinationNode);
+
+					} else {
+
+						logDebug("!!! Received virtual link message: {}", p);
+
+					}
+
+					replyArr[1] = requestId;
+					replyArr[2] = 0;
+					MessagePacket reply = new MessagePacket(MESSAGE_TYPE_WISELIB_UPSTREAM, replyArr);
+					logDebug("Replying with WISELIB upstream packet: {}", reply);
+					notifyReceivePacket(reply);
+
 				}
 			}
+		} else if (p.getType() == MESSAGE_TYPE_MOCK_DEVICE_PING) {
 
-			// Send final DLT ETX
-			outputStream.write(DLE_ETX);
-			outputStream.flush();
-		} else {
-			// Transmit the byte array without dle framing
-			for (int i = 0; i < b.length; ++i) {
-				outputStream.write(b[i]);
-			}
+			sendBinaryMessage(MESSAGE_TYPE_MOCK_DEVICE_PING, p.getContent());
+
 		}
 	}
 
 	@Override
 	public void eraseFlash(Sectors.SectorIndex sector) throws Exception {
-		logWarn("No device connection available (Ignoring action)");
+		// nothing to do
 	}
-
-	// -------------------------------------------------------------------------
-
-	/*
-	 * (non-Javadoc)
-	 *
-	 * @see ishell.device.iSenseDeviceImpl#shutdown()
-	 */
 
 	@Override
 	public void shutdown() {
-		if (log.isDebugEnabled()) {
-			logDebug("Shutting down device");
-		}
-
-		if (inputStream != null) {
-			try {
-				inputStream.close();
-			} catch (IOException e) {
-				logDebug("Unable to close input stream: " + e);
-			}
-		}
-		if (outputStream != null) {
-			try {
-				outputStream.close();
-			} catch (IOException e) {
-				logDebug("Unable to close output stream: " + e);
-			}
-		}
-
-		if (serialPort != null) {
-			serialPort.setRTS(true);
-			serialPort.setDTR(false);
-
-			serialPort.removeEventListener();
-			serialPort.close();
-			serialPort = null;
-			connected = false;
-		}
-	}
-
-	/*
-	 * (non-Javadoc)
-	 *
-	 * @see ishell.device.iSenseDeviceImpl#writeFlash(int, byte[], int, int)
-	 */
-
-	@Override
-	public byte[] writeFlash(int address, byte[] bytes, int offset, int len)
-			throws IOException {
-            byte[] reply = null;
-
-            try {
-                
-                if (enterProgrammingMode()) {
-                    //TODO start programming over external tool
-                }
-            } catch (TimeoutException ex) {
-                java.util.logging.Logger.getLogger(TrisosDevice.class.getName()).log(Level.SEVERE, null, ex);
-            } catch (InvalidChecksumException ex) {
-                java.util.logging.Logger.getLogger(TrisosDevice.class.getName()).log(Level.SEVERE, null, ex);
-            } catch (ReceivedIncorrectDataException ex) {
-                java.util.logging.Logger.getLogger(TrisosDevice.class.getName()).log(Level.SEVERE, null, ex);
-            } catch (FlashEraseFailedException ex) {
-                java.util.logging.Logger.getLogger(TrisosDevice.class.getName()).log(Level.SEVERE, null, ex);
-            } catch (UnexpectedResponseException ex) {
-                java.util.logging.Logger.getLogger(TrisosDevice.class.getName()).log(Level.SEVERE, null, ex);
-            } catch (Exception ex) {
-                java.util.logging.Logger.getLogger(TrisosDevice.class.getName()).log(Level.SEVERE, null, ex);
-            }
-
-            return reply;
-	}
+        aliveRunnableFuture.cancel(true);
+    }
 
 	@Override
 	public boolean isConnected() {
-		return connected;
+		return true;
 	}
 
-	// -------------------------------------------------------------------------
-
-	/*
-	 * (non-Javadoc)
-	 *
-	 * @see ishell.device.iSenseDevice#triggerGetMacAddress(boolean)
-	 */
-
 	@Override
-	public void triggerGetMacAddress(boolean rebootAfterFlashing)
-			throws Exception {
-		if (log.isDebugEnabled()) {
-			log
-					.debug("Device getMAC Address triggered but not yet implemented.");
+	public void triggerGetMacAddress(boolean rebootAfterFlashing) throws Exception {
+		// nothing to do
+	}
+
+	private class ProgramRunnable implements Runnable {
+
+		@Override
+		public void run() {
+
+			Random rand = new Random();
+
+			for (int i = 0; i < 100; i += rand.nextInt(10)) {
+
+				try {
+					sleep(1000);
+				} catch (InterruptedException e) {
+					logError("" + e, e);
+				}
+				TrisosDevice.this.operationProgress(Operation.PROGRAM, (float) i / (float) 100);
+
+			}
+
+			TrisosDevice.this.operationDone(Operation.PROGRAM, null);
+
+			if (TrisosDevice.this.rebootAfterFlashing) {
+				logDebug("Rebooting device");
+				try {
+					TrisosDevice.this.reset();
+				} catch (Exception e) {
+					logError("" + e, e);
+				}
+			}
+
+			operation = null;
 		}
 	}
 
-	// -------------------------------------------------------------------------
-
-	/**
-	 *
-	 */
 	@Override
 	public boolean triggerProgram(IDeviceBinFile program, boolean rebootAfterFlashing) throws Exception {
-		logWarn("No device connection available (Ignoring action)");
-		return false;
+		this.rebootAfterFlashing = rebootAfterFlashing;
+		if (operationInProgress()) {
+			logError("Already another operation in progress (" + operation + ")");
+			return false;
+		}
+		executorService.execute(new ProgramRunnable());
+		return true;
 	}
 
-	// -------------------------------------------------------------------------
-
-	/**
-	 *
-	 */
 	@Override
 	public void triggerSetMacAddress(MacAddress mac, boolean rebootAfterFlashing) throws Exception {
-		logWarn("No device connection available (Ignoring action)");
+		// nothing to do
 	}
 
-	// -------------------------------------------------------------------------
+	@Override
+	public byte[] writeFlash(int address, byte[] bytes, int offset, int len) throws Exception {
+		return bytes;
+	}
 
-	/**
-	 *
-	 */
+	private class RebootRunnable implements Runnable {
+
+		@Override
+		public void run() {
+			executorService.execute(new ResetRunnable());
+			TrisosDevice.this.operationDone(Operation.RESET, null);
+		}
+	}
+
 	@Override
 	public boolean triggerReboot() throws Exception {
-		logWarn("No device connection available (Ignoring action)");
-		return false;
+		executorService.execute(new RebootRunnable());
+		return true;
 	}
 
-	// -------------------------------------------------------------------------
-
-	/**
-	 *
-	 */
 	@Override
 	public String toString() {
-		return "NullDevice";
+		return "TrisosDevice [" + nodeName + "]";
 	}
 
 	@Override
 	public int[] getChannels() {
-		int[] channels = {11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26};
-		return channels;
+		return new int[]{11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26};
 	}
 
-
 	@Override
-	public IDeviceBinFile loadBinFile(String fileName) throws Exception {
-		return new TrisosBinFile(fileName);
+	public IDeviceBinFile loadBinFile(String fileName) {
+		return new TrisosBinFile();
+	}
+
+	private void sendVirtualLinkMessage(final String message) {
+
+		byte[] payload = message.getBytes();
+
+		for (Long virtualLinkDestinationNode : virtualLinks) {
+
+			logDebug("Sending virtual link message to node ID {}", virtualLinkDestinationNode);
+
+			ByteBuffer bb = ByteBuffer.allocate(payload.length + 21);
+			bb.put((byte) 52);
+			bb.put((byte) 0);
+			bb.put((byte) 0);
+			bb.put((byte) payload.length);
+			bb.putLong(virtualLinkDestinationNode);
+			bb.putLong(nodeId);
+			bb.put(payload);
+
+			MessagePacket p = new MessagePacket(MESSAGE_TYPE_WISELIB_UPSTREAM, bb.array());
+			notifyReceivePacket(p);
+
+		}
+
+	}
+
+	private void sendLogMessage(String message) {
+
+		byte[] msgBytes = message.getBytes();
+		byte[] bytes = new byte[msgBytes.length + 2];
+		bytes[0] = PacketTypes.LOG;
+		bytes[1] = PacketTypes.LogType.DEBUG;
+		System.arraycopy(msgBytes, 0, bytes, 2, msgBytes.length);
+
+		MessagePacket messagePacket = MessagePacket.parse(bytes, 0, bytes.length);
+		logDebug("Emitting textual log message packet: {}", messagePacket);
+		notifyReceivePacket(messagePacket);
+
+	}
+
+	private void sendBinaryMessage(final byte binaryType, final byte[] binaryData) {
+
+		MessagePacket messagePacket = new MessagePacket(binaryType, binaryData);
+
+		logDebug("Emitting binary data message packet: {}", messagePacket);
+		notifyReceivePacket(messagePacket);
 	}
 }

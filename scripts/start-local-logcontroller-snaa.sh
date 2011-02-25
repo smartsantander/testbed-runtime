@@ -1,7 +1,7 @@
 #!/bin/bash
 SCRIPT_DIR=`dirname $0`
 TR_DIR=$SCRIPT_DIR/..
-TR_VERSION=0.5.4-SNAPSHOT
+TR_VERSION=0.5.6-SNAPSHOT
 
 if [ ! -d $SCRIPT_DIR/logs ]; then
 	mkdir -p $SCRIPT_DIR/logs
