@@ -13,6 +13,8 @@ import de.uniluebeck.itm.wsn.devicedrivers.pacemate.PacemateBinFile;
 import de.uniluebeck.itm.wsn.devicedrivers.pacemate.PacemateDevice;
 import de.uniluebeck.itm.wsn.devicedrivers.telosb.TelosbBinFile;
 import de.uniluebeck.itm.wsn.devicedrivers.telosb.TelosbDevice;
+import de.uniluebeck.itm.wsn.devicedrivers.trisos.TrisosBinFile;
+import de.uniluebeck.itm.wsn.devicedrivers.trisos.TrisosDevice;
 import org.apache.log4j.Level;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -55,6 +57,8 @@ public class DeviceFlasherCLI {
 				iSenseBinFile = new TelosbBinFile(args[2]);
 			} else if (device instanceof PacemateDevice) {
 				iSenseBinFile = new PacemateBinFile(args[2]);
+			} else if (device instanceof TrisosDevice) {
+				iSenseBinFile = new TrisosBinFile(args[2]);
 			}
 
 		} catch (Exception e) {

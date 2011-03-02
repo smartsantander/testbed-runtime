@@ -42,6 +42,8 @@ import de.uniluebeck.itm.wsn.devicedrivers.pacemate.PacemateBinFile;
 import de.uniluebeck.itm.wsn.devicedrivers.pacemate.PacemateDevice;
 import de.uniluebeck.itm.wsn.devicedrivers.telosb.TelosbBinFile;
 import de.uniluebeck.itm.wsn.devicedrivers.telosb.TelosbDevice;
+import de.uniluebeck.itm.wsn.devicedrivers.trisos.TrisosBinFile;
+import de.uniluebeck.itm.wsn.devicedrivers.trisos.TrisosDevice;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -700,6 +702,9 @@ public class WSNDeviceAppConnectorLocal extends AbstractListenable<WSNDeviceAppC
 			} else if (device instanceof PacemateDevice) {
 				iSenseBinFile =
 						new PacemateBinFile(program.getProgram().toByteArray(), program.getMetaData().toString());
+			} else if (device instanceof TrisosDevice) {
+				iSenseBinFile =
+						new TrisosBinFile(program.getProgram().toByteArray(), program.getMetaData().toString());
 			}
 
 		} catch (Exception e) {

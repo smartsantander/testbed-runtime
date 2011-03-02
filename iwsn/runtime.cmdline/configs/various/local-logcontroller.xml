@@ -25,10 +25,6 @@
 	<nodes id="local-logcontroller">
 		<names>
 			<nodename name="urn:local-logcontroller:0x0001" description="" />
-			<nodename name="urn:local-logcontroller:0x0002" description="" />
-			<nodename name="urn:local-logcontroller:0x0003" description="" />
-			<nodename name="urn:local-logcontroller:0x0004" description="" />
-			<nodename name="urn:local-logcontroller:0x0005" description="" />
 		</names>
 		<applications>
 			<application name="PortalServer" factoryclass="de.uniluebeck.itm.tr.runtime.portalapp.PortalServerFactory">
@@ -46,35 +42,7 @@
 				<ns4:device xmlns:ns4="http://itm.uniluebeck.de/tr/runtime/wsnapp/xml">
 					<urn>urn:local-logcontroller:0x0001</urn>
 					<type>trisos</type>
-					<serialinterface>urn:local-logcontroller:0x0001,60,SECONDS</serialinterface>
-				</ns4:device>
-			</application>
-			<application name="WSNDeviceApp" factoryclass="de.uniluebeck.itm.tr.runtime.wsnapp.WSNDeviceAppFactory">
-				<ns4:device xmlns:ns4="http://itm.uniluebeck.de/tr/runtime/wsnapp/xml">
-					<urn>urn:local-logcontroller:0x0002</urn>
-					<type>trisos</type>
-					<serialinterface>urn:local-logcontroller:0x0002,60,SECONDS</serialinterface>
-				</ns4:device>
-			</application>
-			<application name="WSNDeviceApp" factoryclass="de.uniluebeck.itm.tr.runtime.wsnapp.WSNDeviceAppFactory">
-				<ns4:device xmlns:ns4="http://itm.uniluebeck.de/tr/runtime/wsnapp/xml">
-					<urn>urn:local-logcontroller:0x0003</urn>
-					<type>trisos</type>
-					<serialinterface>urn:local-logcontroller:0x0002,60,SECONDS</serialinterface>
-				</ns4:device>
-			</application>
-			<application name="WSNDeviceApp" factoryclass="de.uniluebeck.itm.tr.runtime.wsnapp.WSNDeviceAppFactory">
-				<ns4:device xmlns:ns4="http://itm.uniluebeck.de/tr/runtime/wsnapp/xml">
-					<urn>urn:local-logcontroller:0x0004</urn>
-					<type>trisos</type>
-					<serialinterface>urn:local-logcontroller:0x0004,60,SECONDS</serialinterface>
-				</ns4:device>
-			</application>
-			<application name="WSNDeviceApp" factoryclass="de.uniluebeck.itm.tr.runtime.wsnapp.WSNDeviceAppFactory">
-				<ns4:device xmlns:ns4="http://itm.uniluebeck.de/tr/runtime/wsnapp/xml">
-					<urn>urn:local-logcontroller:0x0005</urn>
-					<type>trisos</type>
-					<serialinterface>urn:local-logcontroller:0x0005,60,SECONDS</serialinterface>
+					<serialinterface>COM3</serialinterface>
 				</ns4:device>
 			</application>
 		</applications>

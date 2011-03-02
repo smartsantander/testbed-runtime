@@ -36,51 +36,137 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.StringTokenizer;
 
-/**
- * @author Friedemann Wesner
- *         <p/>
- *         A dummy bin file
- */
+
 public class TrisosBinFile implements IDeviceBinFile {
 
+    private static final Logger log = LoggerFactory.getLogger(TrisosBinFile.class);
+    private String description;
+    private File hexFile = null;
+    private final int blockSize = 4096;
+    private final int startAddress = 0x3000;
+    private String filename = null;
 
-	@Override
-	public int getBlockCount() {
-		return 0;
-	}
+    /**
+     * max bytes per line in a data packet
+     */
+    public final static int linesize = 45;
 
-	@Override
-	public ChipType getFileType() {
-		return ChipType.Unknown;
-	}
+    private int blockIterator = 0;
 
-	@Override
-	public int getLength() {
-		return 0;
-	}
+    /**
+     * checksum reset every 20 lines or end of block
+     */
+    public long crc = 0;
 
-	@Override
-	public BinFileDataBlock getNextBlock() {
-		return new BinFileDataBlock(0, new byte[0]);
-	}
+    private byte[] bytes = null;
 
-	@Override
-	public boolean hasNextBlock() {
-		return false;
-	}
+    private int length = -1;
 
-	@Override
-	public boolean isCompatible(ChipType deviceType) {
-		return false;
-	}
+    public TrisosBinFile(byte[] bytes, String description) throws IOException {
+            this.description = description;
+            load(bytes);
+    }
 
-	@Override
-	public void resetBlockIterator() {
-	}
+    public TrisosBinFile(String filename) throws Exception {
+            this(new File(filename));
+            this.filename = filename;
+    }
 
-	@Override
-	public String toString() {
-		return "TrisosBinFile";
-	}
+    public TrisosBinFile(File hexFile) throws Exception {
+
+            this.hexFile = hexFile;
+            this.description = hexFile.getAbsolutePath();
+
+            if (!hexFile.exists() || !hexFile.canRead()) {
+                    log.error("Unable to open file: " + hexFile.getAbsolutePath());
+                    throw new Exception("Unable to open file: " + hexFile.getAbsolutePath());
+            }
+
+            try {
+
+                    BufferedInputStream bis = new BufferedInputStream(new FileInputStream(hexFile));
+                    byte[] data = new byte[(int) hexFile.length()];
+                    bis.read(data, 0, data.length);
+                    load(data);
+
+            } catch (Exception e) {
+                    log.debug("Unable to load file: " + e, e);
+                    throw new FileLoadException();
+            }
+
+    }
+
+    private void load(byte[] data) throws IOException {
+
+            length = 0;
+            if ((int) data.length % blockSize != 0) {
+                    int block_count = ((int) data.length / blockSize) + 1;
+                    length = block_count * blockSize;
+            } else {
+                    length = (int) data.length;
+            }
+
+            bytes = new byte[length];
+            System.arraycopy(data, 0, bytes, 0, data.length);
+
+            for (int i = data.length; i < length; i++) {
+                    bytes[i] = (byte) 0xff;
+            }
+
+            System.out.println("Extending file 2 to " + this.length);
+            System.out.println("Last bytes: " + this.bytes[this.length - 2] + " " + this.bytes[this.length - 1]);
+
+            // log.debug("Read " + length + " bytes from " + binFile.getAbsolutePath());
+            // log.debug("Total of blocks in " + binFile.getName() + ": " + getBlockCount());
+            // int displayBytes = 200;
+            // log.debug("Bin File starts with: " + Tools.toHexString(bytes, 0, bytes.length < displayBytes ?
+            // bytes.length : displayBytes));
+    }
+
+    @Override
+    public ChipType getFileType() {
+        return ChipType.Unknown;
+    }
+
+    @Override
+    public boolean isCompatible(ChipType deviceType) {
+        return deviceType.equals(getFileType());
+    }
+
+    @Override
+    public void resetBlockIterator() {
+        throw new UnsupportedOperationException("Not supported yet(resetBlockIterator)");
+    }
+
+    @Override
+    public boolean hasNextBlock() {
+        throw new UnsupportedOperationException("Not supported yet(hasNextBlock)");
+    }
+
+    @Override
+    public BinFileDataBlock getNextBlock() {
+        throw new UnsupportedOperationException("Not supported yet(getNextBlock)");
+    }
+
+    @Override
+    public int getBlockCount() {
+        throw new UnsupportedOperationException("Not supported yet(getBlockCount)");
+    }
+
+    @Override
+    public int getLength() {
+        throw new UnsupportedOperationException("Not supported yet(getLength)");
+    }
+
+    public File getFile()
+    {
+        return this.hexFile;
+    }
+
+    public String getFilename()
+    {
+            return this.filename;
+    }
+
 
 }
