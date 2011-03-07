@@ -1,0 +1,1 @@
+java -jar target\tr.wsn-device-utils-0.5.6-SNAPSHOT-listen.jar -p com3 -t trisos -v

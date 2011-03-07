@@ -23,6 +23,7 @@
 
 package de.uniluebeck.itm.wsn.devicedrivers.trisos;
 
+import de.uniluebeck.itm.tr.util.TimeDiff;
 import de.uniluebeck.itm.wsn.devicedrivers.exceptions.*;
 import de.uniluebeck.itm.wsn.devicedrivers.generic.*;
 import de.uniluebeck.itm.wsn.devicedrivers.jennic.FlashType;
@@ -103,7 +104,7 @@ public class TrisosDevice extends iSenseDeviceImpl implements SerialPortEventLis
 	public void setSerialPort(String port) throws Exception {
 		logDebug("TrisosDevice.setSerialPort({})", port);
 		CommPortIdentifier cpi = CommPortIdentifier.getPortIdentifier(port);
-                logDebug("TrisosDevice cpi.getName()", cpi.getName());
+                logDebug("TrisosDevice cpi.getName()={}", cpi.getName());
 		SerialPort sp = null;
 		CommPort commPort = null;
 		for (int i = 0; i < MAX_RETRIES; i++) {
@@ -150,7 +151,11 @@ public class TrisosDevice extends iSenseDeviceImpl implements SerialPortEventLis
 
     @Override
     public Operation getOperation() {
-        throw new UnsupportedOperationException("Not supported yet.");
+        if (operation == null) {
+                return Operation.NONE;
+        } else {
+                return operation.getOperation();
+        }
     }
 
     @Override
@@ -182,13 +187,167 @@ public class TrisosDevice extends iSenseDeviceImpl implements SerialPortEventLis
 
     @Override
     public byte[] readFlash(int address, int len) throws Exception {
-        throw new UnsupportedOperationException("Not supported yet.");
+
+		// Send flash program request
+		sendBootLoaderMessage(Messages.flashReadRequestMessage(address, len));
+
+		// Read flash program response
+		byte[] response = receiveBootLoaderReply(Messages.FLASH_READ_RESPONSE);
+
+		// Remove type and success octet
+		byte[] data = new byte[response.length - 2];
+		System.arraycopy(response, 2, data, 0, response.length - 2);
+
+		// Return data
+		return data;
     }
+
+    /**
+     *
+     */
+    protected void flushReceiveBuffer() {
+            long i = 0;
+            // logDebug("Flushing serial rx buffer");
+
+            if (isConnected()) {
+
+                    try {
+                            while ((i = inputStream.available()) > 0) {
+                                    logDebug("Skipping " + i + " characters while flushing on the serial rx");
+                                    inputStream.skip(i);
+                            }
+                    } catch (IOException e) {
+                            logWarn("Error while serial rx flushing buffer: " + e, e);
+                    }
+            }
+    }
+
+    /**
+     *
+     */
+    protected boolean waitForConnection() {
+            try {
+                    // Send flash read request (in fact, this could be any valid message
+                    // to which the
+                    // device is supposed to respond)
+                    sendBootLoaderMessage(Messages.flashReadRequestMessage(0x24, 0x20));
+                    receiveBootLoaderReply(Messages.FLASH_READ_RESPONSE);
+                    logInfo("Device connection established");
+                    return true;
+            } catch (TimeoutException to) {
+                    logDebug("Still waiting for a connection.");
+            } catch (Exception error) {
+                    logWarn("Exception while waiting for connection", error);
+            }
+
+            flushReceiveBuffer();
+            return false;
+    }
+
+    /**
+     *
+     */
+    private void sendBootLoaderMessage(byte[] message) throws IOException {
+            // Allocate buffer for length + message + checksum
+            byte[] data = new byte[message.length + 2];
+
+            // Prepend length (of message + checksum)
+            data[0] = (byte) (message.length + 1);
+
+            // Copy message into the buffer
+            System.arraycopy(message, 0, data, 1, message.length);
+
+            // Calculate and append checksum
+            data[data.length - 1] = Messages.calculateChecksum(data, 0, data.length - 1);
+
+            // Send message
+            outputStream.write(data);
+            outputStream.flush();
+            System.out.println("SEND DATA(byte[]) TO TRISOS:"+data);
+    }
+
+    /**
+     *
+     */
+    protected byte[] receiveBootLoaderReply(int type) throws TimeoutException, UnexpectedResponseException,
+                    InvalidChecksumException, IOException, NullPointerException {
+
+            waitDataAvailable(inputStream, receiveTimeout);
+            // Read message length
+            int length = (int) inputStream.read();
+
+            // Allocate message buffer
+            byte[] message = new byte[length - 1];
+
+            // Read rest of the message (except the checksum
+            for (int i = 0; i < message.length; ++i) {
+                    waitDataAvailable(inputStream, timeoutMillis);
+                    message[i] = (byte) inputStream.read();
+            }
+
+            // logDebug("Received boot loader msg: " + Tools.toHexString(message));
+
+            // Read checksum
+            waitDataAvailable(inputStream, timeoutMillis);
+            byte recvChecksum = (byte) inputStream.read();
+
+            // Concatenate length and message for checksum calculation
+            byte[] fullMessage = new byte[message.length + 1];
+            fullMessage[0] = (byte) length;
+            System.arraycopy(message, 0, fullMessage, 1, message.length);
+
+//TODO CHECK LATER ON CHECKSUM
+            // Throw exception if checksums diffe
+/*            byte checksum = Messages.calculateChecksum(fullMessage);
+            if (checksum != recvChecksum) {
+                    throw new InvalidChecksumException();
+            }
+*/
+            // Check if the response type is unexpected
+            if (message[0] != type) {
+                    throw new UnexpectedResponseException(type, message[0]);
+            }
+
+            return message;
+    }
+
+
+    /**
+     * Wait at most timeoutMillis for the input stream to become available
+     *
+     * @param istream	   The stream to monitor
+     * @param timeoutMillis Milliseconds to wait until timeout, 0 for no timeout
+     * @return The number of characters available
+     * @throws IOException
+     */
+    private int waitDataAvailable(InputStream istream, int timeoutMillis) throws TimeoutException, IOException {
+            TimeDiff timeDiff = new TimeDiff();
+            int avail = 0;
+
+            while (isConnected() && inputStream != null && (avail = inputStream.available()) == 0) {
+                    if (timeoutMillis > 0 && timeDiff.ms() >= timeoutMillis) {
+                            logWarn("Timeout waiting for data (waited: " + timeDiff.ms() + ", timeoutMs:" + timeoutMillis + ")");
+                            throw new TimeoutException();
+                    }
+
+                    synchronized (dataAvailableMonitor) {
+                            try {
+                                    dataAvailableMonitor.wait(50);
+                            } catch (InterruptedException e) {
+                                    logError("Interrupted: " + e, e);
+                            }
+                    }
+            }
+            return avail;
+    }
+    
+
+    
 
     @Override
     public ChipType getChipType() throws Exception {
         //throw new UnsupportedOperationException("Not supported yet.");
-        return ChipType.Unknown;
+        return ChipType.TRISOS;
     }
 
     @Override
@@ -217,7 +376,16 @@ public class TrisosDevice extends iSenseDeviceImpl implements SerialPortEventLis
 
     @Override
     public void triggerGetMacAddress(boolean rebootAfterFlashing) throws Exception {
-        throw new UnsupportedOperationException("Not supported yet.");
+//        this.rebootAfterFlashing = rebootAfterFlashing;
+        //TODO Reboot
+        logDebug("TrisosDevice: trigger Mac Adress");
+        if (operationInProgress()) {
+                logError("Already another operation in progress (" + operation + ")");
+                return;
+        }
+        operation = new ReadMacAddressOperation(this);
+        operation.setLogIdentifier(logIdentifier);
+        operation.start();
     }
 
     @Override
@@ -227,22 +395,44 @@ public class TrisosDevice extends iSenseDeviceImpl implements SerialPortEventLis
 
     @Override
     public int[] getChannels() {
-        throw new UnsupportedOperationException("Not supported yet.");
+		int[] channels = {11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26};
+		return channels;
     }
 
     @Override
     public IDeviceBinFile loadBinFile(String fileName) throws Exception {
-        throw new UnsupportedOperationException("Not supported yet.");
+        return new TrisosBinFile(fileName);
     }
 
     @Override
     public void shutdown() {
-        throw new UnsupportedOperationException("Not supported yet.");
+		// if (connected) {
+
+		try {
+			if (inputStream != null) {
+				inputStream.close();
+			}
+		} catch (IOException e) {
+			logDebug("Failed to close in-stream :" + e, e);
+		}
+		try {
+			if (outputStream != null) {
+				outputStream.close();
+			}
+		} catch (IOException e) {
+			logDebug("Failed to close out-stream :" + e, e);
+		}
+		if (serialPort != null) {
+			serialPort.removeEventListener();
+			serialPort.close();
+			connected = false;
+			serialPort = null;
+		}
     }
 
     @Override
     public boolean isConnected() {
-        throw new UnsupportedOperationException("Not supported yet.");
+        return connected;
     }
 
     @Override

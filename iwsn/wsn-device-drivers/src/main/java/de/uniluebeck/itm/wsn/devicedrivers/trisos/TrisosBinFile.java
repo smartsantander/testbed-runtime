@@ -125,7 +125,7 @@ public class TrisosBinFile implements IDeviceBinFile {
 
     @Override
     public ChipType getFileType() {
-        return ChipType.Unknown;
+        return ChipType.TRISOS;
     }
 
     @Override

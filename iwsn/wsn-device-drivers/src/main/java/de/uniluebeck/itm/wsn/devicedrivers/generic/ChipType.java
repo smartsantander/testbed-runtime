@@ -53,6 +53,10 @@ public enum ChipType {
 	 */
 	LPC2136,
 	/**
+	 * Mode for Trisos platform
+	 */
+	TRISOS,
+	/**
 	 * Mode for unknown platform
 	 */
 	Unknown;
@@ -104,6 +108,8 @@ public enum ChipType {
 				return 0x24;
 			case JN513XR1:
 				return 0x30;
+                        case TRISOS:
+				return 0x00;
 		}
 		return -1;
 	}
