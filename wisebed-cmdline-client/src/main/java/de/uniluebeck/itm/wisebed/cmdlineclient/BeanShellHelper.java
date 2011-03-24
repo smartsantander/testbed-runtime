@@ -23,6 +23,7 @@
 
 package de.uniluebeck.itm.wisebed.cmdlineclient;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import de.uniluebeck.itm.tr.util.StringUtils;
 import eu.wisebed.testbed.api.rs.v1.ConfidentialReservationData;
@@ -30,7 +31,7 @@ import eu.wisebed.testbed.api.rs.v1.Data;
 import eu.wisebed.testbed.api.rs.v1.SecretReservationKey;
 import eu.wisebed.testbed.api.snaa.v1.AuthenticationTriple;
 import eu.wisebed.testbed.api.snaa.v1.SecretAuthenticationKey;
-import eu.wisebed.testbed.api.wsn.v211.*;
+import eu.wisebed.testbed.api.wsn.v22.*;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -52,7 +53,7 @@ public class BeanShellHelper {
 	private static final Logger log = LoggerFactory.getLogger(BeanShellHelper.class);
 
 	public static Program readProgram(String pathname, String name, final String other, final String platform,
-									   final String version) throws Exception {
+									  final String version) throws Exception {
 
 		final ProgramMetaData programMetaData = new ProgramMetaData();
 		programMetaData.setName(name);
@@ -79,7 +80,7 @@ public class BeanShellHelper {
 	}
 
 	public ConfidentialReservationData createReservationData(Date from, int duration, TimeUnit durationUnit,
-																		   String urnPrefix, String username, String... nodeUrns) {
+															 String urnPrefix, String username, String... nodeUrns) {
 		return generateConfidentialReservationData(
 				Lists.newArrayList(nodeUrns),
 				from,
@@ -92,7 +93,15 @@ public class BeanShellHelper {
 
 	public ConfidentialReservationData generateConfidentialReservationData(List<String> nodeURNs, Date from,
 																		   int duration, TimeUnit durationUnit,
-																		   String urnPrefix, String username) {
+																		   List<String> urnPrefixes,
+																		   List<String> userNames) {
+
+
+		Preconditions.checkArgument(
+				urnPrefixes.size() == userNames.size(),
+				"The list of URN prefixes must have the same length as the list of usernames and the list of passwords"
+		);
+		Preconditions.checkArgument(urnPrefixes.size() > 0, "At least the credentials of one testbed must be given.");
 
 		try {
 
@@ -123,20 +132,37 @@ public class BeanShellHelper {
 			reservationData.getNodeURNs().addAll(nodeURNs);
 			reservationData.setFrom(datatypeFactory.newXMLGregorianCalendar(dtFrom.toGregorianCalendar()));
 			reservationData.setTo(datatypeFactory.newXMLGregorianCalendar(dtUntil.toGregorianCalendar()));
-			reservationData.setUserData("demo-script");
+			reservationData.setUserData(userNames.get(0));
 
-			Data data = new Data();
-			data.setUrnPrefix(urnPrefix);
-			data.setUsername(username);
+			for (int i = 0; i < urnPrefixes.size(); i++) {
 
-			reservationData.getData().add(data);
+				Data data = new Data();
+
+				data.setUrnPrefix(urnPrefixes.get(i));
+				data.setUsername(userNames.get(i));
+
+				reservationData.getData().add(data);
+
+			}
 
 			return reservationData;
 
 		} catch (DatatypeConfigurationException e) {
 			throw new RuntimeException(e);
 		}
+	}
 
+	public ConfidentialReservationData generateConfidentialReservationData(List<String> nodeURNs, Date from,
+																		   int duration, TimeUnit durationUnit,
+																		   String urnPrefix, String userName) {
+		return generateConfidentialReservationData(
+				nodeURNs,
+				from,
+				duration,
+				durationUnit,
+				Lists.newArrayList(urnPrefix),
+				Lists.newArrayList(userName)
+		);
 	}
 
 	public List<SecretAuthenticationKey> generateFakeSNAAAuthentication(String urnPrefix, String username,
@@ -182,13 +208,13 @@ public class BeanShellHelper {
 		return secretAuthKeys;
 	}
 
-	public List<eu.wisebed.testbed.api.wsn.v211.SecretReservationKey> copyRsToWsn(List<SecretReservationKey> keys) {
-		List<eu.wisebed.testbed.api.wsn.v211.SecretReservationKey> newKeys =
-				new ArrayList<eu.wisebed.testbed.api.wsn.v211.SecretReservationKey>();
+	public List<eu.wisebed.testbed.api.wsn.v22.SecretReservationKey> copyRsToWsn(List<SecretReservationKey> keys) {
+		List<eu.wisebed.testbed.api.wsn.v22.SecretReservationKey> newKeys =
+				new ArrayList<eu.wisebed.testbed.api.wsn.v22.SecretReservationKey>();
 
 		for (SecretReservationKey key : keys) {
-			eu.wisebed.testbed.api.wsn.v211.SecretReservationKey newKey =
-					new eu.wisebed.testbed.api.wsn.v211.SecretReservationKey();
+			eu.wisebed.testbed.api.wsn.v22.SecretReservationKey newKey =
+					new eu.wisebed.testbed.api.wsn.v22.SecretReservationKey();
 			newKey.setSecretReservationKey(key.getSecretReservationKey());
 			newKey.setUrnPrefix(key.getUrnPrefix());
 			newKeys.add(newKey);
@@ -197,19 +223,42 @@ public class BeanShellHelper {
 		return newKeys;
 	}
 
-	public List<eu.wisebed.testbed.api.wsn.v211.SecretReservationKey> parseSecretReservationKeys(String str) {
+	public List<eu.wisebed.testbed.api.wsn.v22.SecretReservationKey> parseSecretReservationKeys(String str) {
 		String[] pairs = str.split(";");
-		List<eu.wisebed.testbed.api.wsn.v211.SecretReservationKey> keys = Lists.newArrayList();
+		List<eu.wisebed.testbed.api.wsn.v22.SecretReservationKey> keys = Lists.newArrayList();
 		for (String pair : pairs) {
 			String urnPrefix = pair.split(",")[0];
 			String secretReservationKeys = pair.split(",")[1];
-			eu.wisebed.testbed.api.wsn.v211.SecretReservationKey key =
-					new eu.wisebed.testbed.api.wsn.v211.SecretReservationKey();
+			eu.wisebed.testbed.api.wsn.v22.SecretReservationKey key =
+					new eu.wisebed.testbed.api.wsn.v22.SecretReservationKey();
 			key.setUrnPrefix(urnPrefix);
 			key.setSecretReservationKey(secretReservationKeys);
 			keys.add(key);
 		}
 		return keys;
+	}
+
+	public String toString(Message msg, boolean legacyFormat) {
+
+		if (!legacyFormat) {
+			return toString(msg);
+		}
+
+		StringBuilder b = new StringBuilder();
+		b.append("Source [");
+		b.append(msg.getSourceNodeId());
+		b.append("], ");
+		b.append("Text [");
+		b.append(new String(msg.getBinaryData(), 2, msg.getBinaryData().length-2));
+		b.append("], ");
+		b.append("Level [");
+		b.append(msg.getBinaryData()[1] == 0x00 ? "DEBUG" : "FATAL");
+		b.append("], ");
+		b.append("Time [");
+		b.append(msg.getTimestamp().toXMLFormat());
+		b.append("]");
+
+		return b.toString();
 	}
 
 	public String toString(Message msg) {
@@ -218,19 +267,9 @@ public class BeanShellHelper {
 		b.append(msg.getSourceNodeId());
 		b.append("]");
 
-		if (msg.getTextMessage() != null) {
-			b.append(", Text [");
-			b.append(msg.getTextMessage().getMsg());
-			b.append("], Level[");
-			b.append(msg.getTextMessage().getMessageLevel());
-			b.append("]");
-		}
-
-		if (msg.getBinaryMessage() != null) {
-			b.append(", BinaryType[");
-			b.append(StringUtils.toHexString(msg.getBinaryMessage().getBinaryType()));
-			b.append("], Binary [");
-			b.append(StringUtils.toHexString(msg.getBinaryMessage().getBinaryData()));
+		if (msg.getBinaryData() != null) {
+			b.append(", Binary [");
+			b.append(StringUtils.toHexString(msg.getBinaryData()));
 			b.append("]");
 		}
 
@@ -272,7 +311,7 @@ public class BeanShellHelper {
 			b.append(secretReservationKey.getSecretReservationKey());
 
 			if (secretReservationKeyIterator.hasNext()) {
-				b.append(";");
+				b.append("\\;");
 			}
 		}
 		return b.toString();
@@ -376,17 +415,13 @@ public class BeanShellHelper {
 	/**
 	 * Generate a binary message to be send to a node with timestamop = now and src node id = 0xffff
 	 *
-	 * @param type Type of the binary message
 	 * @param data Payload of the binary message
 	 *
 	 * @return the binary message
 	 */
-	public static Message buildBinaryMessage(byte type, byte[] data) {
+	public static Message buildBinaryMessage(byte[] data) {
 		Message msg = new Message();
-		BinaryMessage bmsg = new BinaryMessage();
-		bmsg.setBinaryData(data);
-		bmsg.setBinaryType(type);
-		msg.setBinaryMessage(bmsg);
+		msg.setBinaryData(data);
 		msg.setSourceNodeId("urn:wisebed:uzl1:0xffff");
 		try {
 			msg.setTimestamp(DatatypeFactory.newInstance().newXMLGregorianCalendar(
@@ -401,7 +436,8 @@ public class BeanShellHelper {
 		return msg;
 	}
 
-	public List<AuthenticationTriple> createAuthData(final String urnPrefix, final String username, final String password) {
+	public List<AuthenticationTriple> createAuthData(final String urnPrefix, final String username,
+													 final String password) {
 		ArrayList<AuthenticationTriple> list = Lists.newArrayList();
 		AuthenticationTriple authenticationTriple = new AuthenticationTriple();
 		authenticationTriple.setUsername(username);

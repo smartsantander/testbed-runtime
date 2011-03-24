@@ -35,11 +35,12 @@ import eu.wisebed.testbed.api.rs.RSServiceHelper;
 import eu.wisebed.testbed.api.rs.v1.ConfidentialReservationData;
 import eu.wisebed.testbed.api.rs.v1.RS;
 import eu.wisebed.testbed.api.rs.v1.RSExceptionException;
-import eu.wisebed.testbed.api.rs.v1.ReservationNotFoundExceptionException;
+import eu.wisebed.testbed.api.rs.v1.ReservervationNotFoundExceptionException;
 import eu.wisebed.testbed.api.wsn.*;
-import eu.wisebed.testbed.api.wsn.v211.ExperimentNotRunningException_Exception;
-import eu.wisebed.testbed.api.wsn.v211.SecretReservationKey;
-import eu.wisebed.testbed.api.wsn.v211.UnknownReservationIdException_Exception;
+import eu.wisebed.testbed.api.wsn.v22.ExperimentNotRunningException_Exception;
+import eu.wisebed.testbed.api.wsn.v22.KeyValuePair;
+import eu.wisebed.testbed.api.wsn.v22.SecretReservationKey;
+import eu.wisebed.testbed.api.wsn.v22.UnknownReservationIdException_Exception;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,6 +48,7 @@ import org.slf4j.LoggerFactory;
 import javax.jws.WebParam;
 import javax.jws.WebService;
 import javax.xml.ws.Endpoint;
+import javax.xml.ws.Holder;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.*;
@@ -112,6 +114,14 @@ public class SessionManagementServiceImpl implements SessionManagementService {
 		private final URL reservationEndpointUrl;
 
 		/**
+		 * The endpoint URL of the authentication and authorization system. If it is {@code null} then the system is not
+		 * used and users are assumed to be always authorized.
+		 *
+		 * TODO currently the SNAA is not used inside SessionManagement or WSN instances for authorization, i.e. there is no authorization currently
+		 */
+		private URL snaaEndpointUrl;
+
+		/**
 		 * The URN prefix that is served by this instance.
 		 */
 		private final String urnPrefix;
@@ -123,7 +133,7 @@ public class SessionManagementServiceImpl implements SessionManagementService {
 
 		/**
 		 * The filename of the file containing the WiseML document that is to delivered when
-		 * {@link eu.wisebed.testbed.api.wsn.v211.SessionManagement#getNetwork()} is called.
+		 * {@link eu.wisebed.testbed.api.wsn.v22.SessionManagement#getNetwork()} is called.
 		 */
 		private final String wiseMLFilename;
 
@@ -132,6 +142,7 @@ public class SessionManagementServiceImpl implements SessionManagementService {
 			this.maximumDeliveryQueueSize = config.getWebservice().getMaximumdeliveryqueuesize();
 			this.sessionManagementEndpointUrl = new URL(config.getWebservice().getSessionmanagementendpointurl());
 			this.reservationEndpointUrl = config.getWebservice().getReservationendpointurl() == null ? null : new URL(config.getWebservice().getReservationendpointurl());
+			this.snaaEndpointUrl = config.getWebservice().getSnaaendpointurl() == null ? null : new URL(config.getWebservice().getSnaaendpointurl());
 			this.urnPrefix = config.getWebservice().getUrnprefix();
 			this.wsnInstanceBaseUrl = new URL(config.getWebservice().getWsninstancebaseurl().endsWith("/") ? config.getWebservice().getWsninstancebaseurl() : config.getWebservice().getWsninstancebaseurl() + "/");
 			this.wiseMLFilename = config.getWebservice().getWisemlfilename();
@@ -429,6 +440,21 @@ public class SessionManagementServiceImpl implements SessionManagementService {
 		return WiseMLHelper.prettyPrintWiseML(WiseMLHelper.readWiseMLFromFile(config.wiseMLFilename));
 	}
 
+	@Override
+	public void getConfiguration(
+			@WebParam(name = "rsEndpointUrl", targetNamespace = "", mode = WebParam.Mode.OUT) final
+			Holder<String> rsEndpointUrl,
+			@WebParam(name = "snaaEndpointUrl", targetNamespace = "", mode = WebParam.Mode.OUT) final
+			Holder<String> snaaEndpointUrl,
+			@WebParam(name = "options", targetNamespace = "", mode = WebParam.Mode.OUT) final
+			Holder<List<KeyValuePair>> options) {
+
+		rsEndpointUrl.value = (config.reservationEndpointUrl == null ? "" : config.reservationEndpointUrl.toString());
+		snaaEndpointUrl.value = (config.snaaEndpointUrl == null ? "" : config.snaaEndpointUrl.toString());
+		// TODO integrate options
+
+	}
+
 	private List<eu.wisebed.testbed.api.rs.v1.SecretReservationKey> convert(
 			List<SecretReservationKey> secretReservationKey) {
 
@@ -469,7 +495,7 @@ public class SessionManagementServiceImpl implements SessionManagementService {
 			log.warn(msg + ": " + e, e);
 			// TODO replace with more generic exception type
 			throw WSNServiceHelper.createUnknownReservationIdException(msg, null, e);
-		} catch (ReservationNotFoundExceptionException e) {
+		} catch (ReservervationNotFoundExceptionException e) {
 			log.debug("Reservation was not found. Message from RS: {}", e.getMessage());
 			throw WSNServiceHelper.createUnknownReservationIdException(e.getMessage(), null, e);
 		}

@@ -25,7 +25,7 @@ package de.uniluebeck.itm.wisebed.cmdlineclient.jobs;
 
 import de.uniluebeck.itm.tr.util.StringUtils;
 import de.uniluebeck.itm.wisebed.cmdlineclient.jobs.Job.JobType;
-import eu.wisebed.testbed.api.wsn.v211.Message;
+import eu.wisebed.testbed.api.wsn.v22.Message;
 import org.apache.log4j.Logger;
 import org.joda.time.DateTime;
 import org.joda.time.Duration;
@@ -62,19 +62,9 @@ public class HtmlWriter implements JobResultListener {
 		write("		<td>" + timeFormatter.print(new DateTime(msg.getTimestamp().toGregorianCalendar())) + "</td>");
 		write("	</tr>");
 
-		if (msg.getTextMessage() != null) {
+		if (msg.getBinaryData() != null) {
 			write("	<tr>");
-			write("		<td>Text</td>");
-			write("		<td>" + msg.getTextMessage().getMessageLevel() + "</td>");
-			write("		<td>" + msg.getTextMessage().getMsg() + "</td>");
-			write("	</tr>");
-		}
-
-		if (msg.getBinaryMessage() != null) {
-			write("	<tr>");
-			write("		<td>Binary</td>");
-			write("		<td>Type " + StringUtils.toHexString(msg.getBinaryMessage().getBinaryType()) + "</td>");
-			write("		<td>" + StringUtils.toHexString(msg.getBinaryMessage().getBinaryData()) + "</td>");
+			write("		<td>" + StringUtils.toHexString(msg.getBinaryData()) + "</td>");
 			write("	</tr>");
 		}
 

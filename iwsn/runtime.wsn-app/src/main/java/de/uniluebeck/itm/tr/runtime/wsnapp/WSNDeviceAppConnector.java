@@ -31,8 +31,8 @@ import de.uniluebeck.itm.wsn.devicedrivers.generic.MessagePacket;
 public interface WSNDeviceAppConnector extends Listenable<WSNDeviceAppConnector.NodeOutputListener>, Service {
 
 	public static interface NodeOutputListener {
-
 		void receivedPacket(MessagePacket p);
+		void receiveNotification(String notification);
 	}
 
 	public static interface Callback {
@@ -57,7 +57,7 @@ public interface WSNDeviceAppConnector extends Listenable<WSNDeviceAppConnector.
 
 	void setVirtualLink(long targetNode, Callback listener);
 
-	void sendMessage(byte binaryType, byte[] binaryMessage, Callback listener);
+	void sendMessage(byte[] binaryMessage, Callback listener);
 
 	void resetNode(Callback listener);
 

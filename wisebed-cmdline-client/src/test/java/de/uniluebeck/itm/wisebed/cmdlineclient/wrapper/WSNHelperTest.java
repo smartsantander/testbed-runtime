@@ -3,16 +3,15 @@ package de.uniluebeck.itm.wisebed.cmdlineclient.wrapper;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
-import eu.wisebed.testbed.api.wsn.v211.Controller;
-import eu.wisebed.testbed.api.wsn.v211.Message;
-import eu.wisebed.testbed.api.wsn.v211.RequestStatus;
+import eu.wisebed.testbed.api.wsn.v22.Controller;
+import eu.wisebed.testbed.api.wsn.v22.Message;
+import eu.wisebed.testbed.api.wsn.v22.RequestStatus;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
 import javax.jws.WebParam;
 import java.util.List;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
@@ -26,21 +25,29 @@ public class WSNHelperTest {
 
 	private List<String> nodeURNs;
 
-	private String sourceNodeURN;
-
 	private Multimap<String, String> neighborhoodMap;
 
 	@Before
 	public void setUp() {
 		Controller controller = new Controller() {
 			@Override
-			public void receive(@WebParam(name = "msg", targetNamespace = "") final Message msg) {
+			public void receive(@WebParam(name = "msg", targetNamespace = "") final List<Message> msg) {
 				// nothing to do
 			}
 
 			@Override
-			public void receiveStatus(@WebParam(name = "status", targetNamespace = "") final RequestStatus status) {
+			public void receiveStatus(@WebParam(name = "status", targetNamespace = "") final List<RequestStatus> status) {
 				wrapper.receive(status);
+			}
+
+			@Override
+			public void receiveNotification(@WebParam(name = "msg", targetNamespace = "") final List<String> msg) {
+				// nothing to do
+			}
+
+			@Override
+			public void experimentEnded() {
+				// nothing to do
 			}
 		};
 		WorkingWSN wsn = new WorkingWSN(controller);
@@ -56,7 +63,6 @@ public class WSNHelperTest {
                 "urn:wisebed:uzl1:0x8901",
                 "urn:wisebed:uzl1:0x9012"
         );
-		sourceNodeURN = "urn:wisebed:uzl1:0x0123";
 		neighborhoodMap = HashMultimap.create();
 		for (String nodeURN : nodeURNs) {
 			for (String urn : nodeURNs) {
@@ -69,7 +75,6 @@ public class WSNHelperTest {
 	public void tearDown() {
 		wrapper = null;
 		nodeURNs = null;
-		sourceNodeURN = null;
 		neighborhoodMap = null;
 	}
 

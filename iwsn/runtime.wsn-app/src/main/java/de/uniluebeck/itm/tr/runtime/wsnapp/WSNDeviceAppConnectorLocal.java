@@ -135,7 +135,8 @@ public class WSNDeviceAppConnectorLocal extends AbstractListenable<WSNDeviceAppC
 					flashTimeoutRunnable.cancel(true);
 					listener.failure((byte) -1, "Operation was cancelled.".getBytes());
 				} finally {
-					log.debug("{} => Setting state to READY and deregistering FlashProgramListener instance.", nodeUrn);
+					log.debug("{} => Setting state to READY and de-registering FlashProgramListener instance.", nodeUrn
+					);
 					device.deregisterListener(FlashProgramListener.this);
 					state.setState(State.READY);
 				}
@@ -169,7 +170,8 @@ public class WSNDeviceAppConnectorLocal extends AbstractListenable<WSNDeviceAppC
 					}
 
 				} finally {
-					log.debug("{} => Setting state to READY and deregistering FlashProgramListener instance.", nodeUrn);
+					log.debug("{} => Setting state to READY and de-registering FlashProgramListener instance.", nodeUrn
+					);
 					device.deregisterListener(this);
 					state.setState(State.READY);
 				}
@@ -252,7 +254,7 @@ public class WSNDeviceAppConnectorLocal extends AbstractListenable<WSNDeviceAppC
 
 					listener.failure((byte) -1, "Operation was cancelled.".getBytes());
 				} finally {
-					log.debug("{} => Setting state to READY and deregistering ResetListener instance.", nodeUrn);
+					log.debug("{} => Setting state to READY and de-registering ResetListener instance.", nodeUrn);
 					device.deregisterListener(this);
 					state.setState(State.READY);
 				}
@@ -271,7 +273,9 @@ public class WSNDeviceAppConnectorLocal extends AbstractListenable<WSNDeviceAppC
 		public void operationDone(final Operation op, final Object result) {
 
 			if (log.isDebugEnabled()) {
-				log.debug("{} => WSNDeviceAppConnectorLocal.ResetListener.operationDone({}, {})", new Object[]{nodeUrn, op, result});
+				log.debug("{} => WSNDeviceAppConnectorLocal.ResetListener.operationDone({}, {})",
+						new Object[]{nodeUrn, op, result}
+				);
 			}
 
 			if (op == Operation.RESET) {
@@ -291,7 +295,7 @@ public class WSNDeviceAppConnectorLocal extends AbstractListenable<WSNDeviceAppC
 						listener.failure((byte) -1, "Could not reset node.".getBytes());
 					}
 				} finally {
-					log.debug("{} => Setting state to READY and deregistering ResetListener instance.", nodeUrn);
+					log.debug("{} => Setting state to READY and de-registering ResetListener instance.", nodeUrn);
 					device.deregisterListener(this);
 					state.setState(State.READY);
 				}
@@ -337,35 +341,33 @@ public class WSNDeviceAppConnectorLocal extends AbstractListenable<WSNDeviceAppC
 
 	private static final byte VIRTUAL_LINK_MESSAGE = 11;
 
-	private static final byte MESSAGE_TYPE_LOG = 104;
-
-	private static final byte LOG_MESSAGE_TYPE_FATAL = 1;
-
 	private static final Logger log = LoggerFactory.getLogger(WSNDeviceAppConnector.class);
 
 	private static final int DEFAULT_NODE_API_TIMEOUT = 1000;
 
 	private static final int DEFAULT_MAXIMUM_MESSAGE_RATE = Integer.MAX_VALUE;
 
-	private String nodeType;
+	private final String nodeType;
 
-	private String nodeUSBChipID;
-
-	private Integer maximumMessageRate;
+	private final String nodeUSBChipID;
 
 	private String nodeSerialInterface;
 
-	private SchedulerService schedulerService;
+	private final SchedulerService schedulerService;
 
-	private ConnectorState state = new ConnectorState();
+	private final ConnectorState state = new ConnectorState();
 
 	private int resetCount = 0;
 
 	private int flashCount = 0;
 
-	private RateLimiter maximumMessageRateLimiter;
+	private final int maximumMessageRate;
 
-	private Runnable connectRunnable = new Runnable() {
+	private final TimeUnit maximumMessageRateTimeUnit;
+
+	private final RateLimiter maximumMessageRateLimiter;
+
+	private final Runnable connectRunnable = new Runnable() {
 		@Override
 		public void run() {
 
@@ -449,9 +451,10 @@ public class WSNDeviceAppConnectorLocal extends AbstractListenable<WSNDeviceAppC
 		@Override
 		public void receivePacket(MessagePacket p) {
 			//if reaching maximum-message-rate do not send more then 1 message
-			if (!maximumMessageRateLimiter.checkIfInSlotAndCount()){
-				if (maximumMessageRateLimiter.dismissedCount() == 1) {
-					sendWarningToUserMaximumMessageRateReached();
+			if (!maximumMessageRateLimiter.checkIfInSlotAndCount()) {
+				int dismissedCount = maximumMessageRateLimiter.dismissedCount();
+				if (dismissedCount >= 1) {
+					sendPacketsDroppedWarningIfNotificationRateAllows(dismissedCount);
 				}
 				return;
 			}
@@ -495,16 +498,31 @@ public class WSNDeviceAppConnectorLocal extends AbstractListenable<WSNDeviceAppC
 
 	};
 
-	private void sendWarningToUserMaximumMessageRateReached() {
-		log.warn("Maximum message-rate reached! Dropping message(s) in {}:backend.",
-				maximumMessageRateLimiter.dismissedCount(), nodeUrn);
-		String maximumMessageRateReachedMessage = nodeUrn + ":backend: " +
-				"Warning: message(s) dropped, because of maximum message rate.";
-		byte[] message = new byte[maximumMessageRateReachedMessage.getBytes().length + 2];
-		System.arraycopy(maximumMessageRateReachedMessage.getBytes(), 0, message, 2, maximumMessageRateReachedMessage.getBytes().length);
-		message[0] = MESSAGE_TYPE_LOG;
-		message[1] = LOG_MESSAGE_TYPE_FATAL;
-		nodeApiDeviceAdapter.sendToNode(ByteBuffer.wrap(message));
+	private static final int PACKETS_DROPPED_NOTIFICATION_RATE = 1000;
+
+	private final TimeDiff packetsDroppedTimeDiff = new TimeDiff(PACKETS_DROPPED_NOTIFICATION_RATE);
+
+	private int packetsDroppedSinceLastNotification = 0;
+
+	private void sendPacketsDroppedWarningIfNotificationRateAllows(int packetsDropped) {
+
+		packetsDroppedSinceLastNotification += packetsDropped;
+
+		if (packetsDroppedTimeDiff.isTimeout()) {
+
+			String notification =
+					"Dropped " + packetsDroppedSinceLastNotification + " packets of " + nodeUrn + " in the last "
+							+ packetsDroppedTimeDiff.ms() + " milliseconds, because the node writes more packets to "
+							+ "the serial interface per second than allowed (" + maximumMessageRate + " per " +
+							maximumMessageRateTimeUnit + ").";
+
+			for (NodeOutputListener listener : listeners) {
+				listener.receiveNotification(notification);
+			}
+
+			packetsDroppedSinceLastNotification = 0;
+			packetsDroppedTimeDiff.touch();
+		}
 	}
 
 	private NodeApi nodeApi;
@@ -532,17 +550,18 @@ public class WSNDeviceAppConnectorLocal extends AbstractListenable<WSNDeviceAppC
 	private iSenseDevice device;
 
 	public WSNDeviceAppConnectorLocal(final String nodeUrn, final String nodeType, final String nodeUSBChipID,
-									  final String nodeSerialInterface, final Integer nodeAPITimeout, final Integer maximumMessageRate,
-									  final SchedulerService schedulerService) {
+									  final String nodeSerialInterface, final Integer nodeAPITimeout,
+									  final Integer maximumMessageRate, final SchedulerService schedulerService) {
 
 		this.nodeUrn = nodeUrn;
 		this.nodeType = nodeType;
 		this.nodeUSBChipID = nodeUSBChipID;
 		this.nodeSerialInterface = nodeSerialInterface;
-		this.maximumMessageRate = (maximumMessageRate == null ? DEFAULT_MAXIMUM_MESSAGE_RATE : maximumMessageRate);
 		this.schedulerService = schedulerService;
 
-		this.maximumMessageRateLimiter = new RateLimiterImpl(maximumMessageRate, 1, TimeUnit.SECONDS);
+		this.maximumMessageRate = (maximumMessageRate == null ? DEFAULT_MAXIMUM_MESSAGE_RATE : maximumMessageRate);
+		this.maximumMessageRateTimeUnit = TimeUnit.SECONDS;
+		this.maximumMessageRateLimiter = new RateLimiterImpl(this.maximumMessageRate, 1, maximumMessageRateTimeUnit);
 
 		this.nodeApi =
 				new NodeApi(nodeApiDeviceAdapter, nodeAPITimeout == null ? DEFAULT_NODE_API_TIMEOUT : nodeAPITimeout,
@@ -867,8 +886,7 @@ public class WSNDeviceAppConnectorLocal extends AbstractListenable<WSNDeviceAppC
 	}
 
 	@Override
-	public void sendMessage(final byte messageType, final byte[] messageBytes,
-							final WSNDeviceAppConnector.Callback listener) {
+	public void sendMessage(final byte[] messageBytes, final WSNDeviceAppConnector.Callback listener) {
 
 		log.debug("{} => WSNDeviceAppConnectorLocal.sendMessage()", nodeUrn);
 
@@ -880,20 +898,21 @@ public class WSNDeviceAppConnectorLocal extends AbstractListenable<WSNDeviceAppC
 
 			case READY:
 				try {
-					if (messageType == MESSAGE_TYPE_WISELIB_DOWNSTREAM && messageBytes[0] == VIRTUAL_LINK_MESSAGE) {
+
+					if (isVirtualLinkMessage(messageBytes)) {
 
 						log.debug("{} => Delivering virtual link message over node API", nodeUrn);
 
 						ByteBuffer messageBuffer = ByteBuffer.wrap(messageBytes);
 
-						final byte RSSI = messageBuffer.get(2);
-						final byte LQI = messageBuffer.get(3);
-						final byte payloadLength = messageBuffer.get(4);
-						final long destination = messageBuffer.getLong(5);
-						final long source = messageBuffer.getLong(13);
+						final byte RSSI = messageBuffer.get(3);
+						final byte LQI = messageBuffer.get(4);
+						final byte payloadLength = messageBuffer.get(5);
+						final long destination = messageBuffer.getLong(6);
+						final long source = messageBuffer.getLong(14);
 						final byte[] payload = new byte[payloadLength];
 
-						System.arraycopy(messageBytes, 21, payload, 0, payloadLength);
+						System.arraycopy(messageBytes, 22, payload, 0, payloadLength);
 
 						schedulerService.execute(new Runnable() {
 							@Override
@@ -915,7 +934,7 @@ public class WSNDeviceAppConnectorLocal extends AbstractListenable<WSNDeviceAppC
 								nodeUrn
 						);
 
-						device.send(new MessagePacket(messageType, messageBytes));
+						device.send(new MessagePacket(messageBytes));
 						listener.success(null);
 
 					}
@@ -934,6 +953,10 @@ public class WSNDeviceAppConnectorLocal extends AbstractListenable<WSNDeviceAppC
 
 	}
 
+	private boolean isVirtualLinkMessage(final byte[] messageBytes) {
+		return messageBytes.length > 1 && messageBytes[0] == MESSAGE_TYPE_WISELIB_DOWNSTREAM && messageBytes[1] == VIRTUAL_LINK_MESSAGE;
+	}
+
 	@Override
 	public void setVirtualLink(final long targetNode, final WSNDeviceAppConnector.Callback listener) {
 
@@ -949,7 +972,8 @@ public class WSNDeviceAppConnectorLocal extends AbstractListenable<WSNDeviceAppC
 					public void run() {
 						callCallback(nodeApi.getLinkControl().setVirtualLink(targetNode), listener);
 					}
-				});
+				}
+				);
 				break;
 			case OPERATION_RUNNING:
 				listener.failure((byte) -1, "Node is currently being reprogrammed/reset. Try again later.".getBytes());

@@ -2,7 +2,7 @@ package de.uniluebeck.itm.wisebed.cmdlineclient.wrapper;
 
 import com.google.common.collect.Lists;
 import de.uniluebeck.itm.tr.util.SecureIdGenerator;
-import eu.wisebed.testbed.api.wsn.v211.*;
+import eu.wisebed.testbed.api.wsn.v22.*;
 
 import javax.jws.WebParam;
 import javax.xml.datatype.XMLGregorianCalendar;
@@ -38,7 +38,7 @@ public class WorkingWSN implements WSN {
 					status.setNodeId(nodeId);
 					status.setValue(value);
 					requestStatus.getStatus().add(status);
-					controller.receiveStatus(requestStatus);
+					controller.receiveStatus(Lists.newArrayList(requestStatus));
 				}
 			}, random.nextInt(100), TimeUnit.MILLISECONDS
 			);

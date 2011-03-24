@@ -1,18 +1,18 @@
 package de.uniluebeck.itm.wisebed.cmdlineclient.wrapper;
 
 import com.google.common.util.concurrent.ValueFuture;
-import de.uniluebeck.itm.tr.util.ExecutorUtils;
 import de.uniluebeck.itm.wisebed.cmdlineclient.jobs.AsyncJobObserver;
 import de.uniluebeck.itm.wisebed.cmdlineclient.jobs.Job;
 import de.uniluebeck.itm.wisebed.cmdlineclient.jobs.JobResult;
 import de.uniluebeck.itm.wisebed.cmdlineclient.jobs.JobResultListener;
-import eu.wisebed.testbed.api.wsn.v211.Message;
-import eu.wisebed.testbed.api.wsn.v211.Program;
-import eu.wisebed.testbed.api.wsn.v211.RequestStatus;
-import eu.wisebed.testbed.api.wsn.v211.WSN;
+import eu.wisebed.testbed.api.wsn.v22.Message;
+import eu.wisebed.testbed.api.wsn.v22.Program;
+import eu.wisebed.testbed.api.wsn.v22.RequestStatus;
+import eu.wisebed.testbed.api.wsn.v22.WSN;
 
 import javax.xml.datatype.XMLGregorianCalendar;
 import java.io.IOException;
+import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.*;
 
@@ -55,6 +55,12 @@ public class WSNAsyncWrapper {
 
 	public static WSNAsyncWrapper of(final WSN wsn) {
 		return new WSNAsyncWrapper(wsn);
+	}
+
+	public void receive(Collection<RequestStatus> requestStatuses) {
+		for (RequestStatus requestStatus : requestStatuses) {
+			jobs.receive(requestStatus);
+		}
 	}
 
 	public void receive(RequestStatus requestStatus) {
@@ -109,10 +115,12 @@ public class WSNAsyncWrapper {
 		return future;
 	}
 
+	@SuppressWarnings("unused")
 	public Future<JobResult> defineNetwork(String newNetwork) {
 		throw new UnsupportedOperationException("Not yet implemented!");
 	}
 
+	@SuppressWarnings("unused")
 	public Future<String> describeCapabilities(String capability) {
 		throw new UnsupportedOperationException("Not yet implemented!");
 	}
@@ -145,6 +153,7 @@ public class WSNAsyncWrapper {
 		return future;
 	}
 
+	@SuppressWarnings("unused")
 	public Future<JobResult> enableNode(String node, int timeout, TimeUnit timeUnit) {
 		ValueFuture<JobResult> future = ValueFuture.create();
 		Job job = new Job("enableNode", wsn.enableNode(node), node, Job.JobType.enableNode);
@@ -223,6 +232,7 @@ public class WSNAsyncWrapper {
 		return future;
 	}
 
+	@SuppressWarnings("unused")
 	public Future<?> setStartTime(XMLGregorianCalendar time) {
 		throw new UnsupportedOperationException("Not yet implemented!");
 	}

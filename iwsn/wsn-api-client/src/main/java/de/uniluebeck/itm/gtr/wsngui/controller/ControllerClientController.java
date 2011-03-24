@@ -23,12 +23,13 @@
 
 package de.uniluebeck.itm.gtr.wsngui.controller;
 
+import com.google.common.collect.Lists;
 import de.uniluebeck.itm.gtr.wsngui.Dialogs;
 import de.uniluebeck.itm.gtr.wsngui.WSNClientProperties;
 import eu.wisebed.testbed.api.wsn.WSNServiceHelper;
-import eu.wisebed.testbed.api.wsn.v211.Controller;
-import eu.wisebed.testbed.api.wsn.v211.Message;
-import eu.wisebed.testbed.api.wsn.v211.RequestStatus;
+import eu.wisebed.testbed.api.wsn.v22.Controller;
+import eu.wisebed.testbed.api.wsn.v22.Message;
+import eu.wisebed.testbed.api.wsn.v22.RequestStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -65,7 +66,7 @@ public class ControllerClientController {
 
 			if (message != null) {
 
-				getControllerService().receive(message);
+				getControllerService().receive(Lists.newArrayList(message));
 				log.info("Called Controller.receive() successfully...");
 
 			}
@@ -87,7 +88,7 @@ public class ControllerClientController {
 
 			if (status != null) {
 
-				getControllerService().receiveStatus(status);
+				getControllerService().receiveStatus(Lists.newArrayList(status));
 				log.info("Called Controller.receiveStatus() successfully...");
 
 			}

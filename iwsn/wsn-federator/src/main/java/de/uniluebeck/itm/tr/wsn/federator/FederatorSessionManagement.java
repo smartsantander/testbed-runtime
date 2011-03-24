@@ -35,7 +35,7 @@ import eu.wisebed.testbed.api.wsn.Constants;
 import eu.wisebed.testbed.api.wsn.SessionManagementHelper;
 import eu.wisebed.testbed.api.wsn.SessionManagementPreconditions;
 import eu.wisebed.testbed.api.wsn.WSNServiceHelper;
-import eu.wisebed.testbed.api.wsn.v211.*;
+import eu.wisebed.testbed.api.wsn.v22.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,11 +43,16 @@ import javax.jws.WebParam;
 import javax.jws.WebService;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.ws.Endpoint;
+import javax.xml.ws.Holder;
 import java.util.*;
 import java.util.concurrent.*;
 
-@WebService(serviceName = "SessionManagementService", targetNamespace = Constants.NAMESPACE_SESSION_MANAGEMENT_SERVICE,
-		portName = "SessionManagementPort", endpointInterface = Constants.ENDPOINT_INTERFACE_SESSION_MANGEMENT_SERVICE)
+@WebService(
+		serviceName = "SessionManagementService",
+		targetNamespace = Constants.NAMESPACE_SESSION_MANAGEMENT_SERVICE,
+		portName = "SessionManagementPort",
+		endpointInterface = Constants.ENDPOINT_INTERFACE_SESSION_MANGEMENT_SERVICE
+)
 public class FederatorSessionManagement implements SessionManagement {
 
 	/**
@@ -66,6 +71,11 @@ public class FederatorSessionManagement implements SessionManagement {
 	 * Session Management Service sessionManagementEndpoint URL <-> Set<URN Prefixes>
 	 */
 	private final BiMap<String, Set<String>> sessionManagementEndpointUrlPrefixSet;
+
+	/**
+	 *
+	 */
+	private final String snaaEndpointUrl;
 
 	/**
 	 *
@@ -104,10 +114,14 @@ public class FederatorSessionManagement implements SessionManagement {
 	 */
 	private SessionManagementPreconditions preconditions;
 
-	public FederatorSessionManagement(BiMap<String, Set<String>> sessionManagementEndpointUrlPrefixSet,
-									  String endpointUrlBase, String path, String reservationEndpointUrl) {
+	public FederatorSessionManagement(final BiMap<String, Set<String>> sessionManagementEndpointUrlPrefixSet,
+									  final String endpointUrlBase,
+									  final String path,
+									  final String reservationEndpointUrl,
+									  final String snaaEndpointUrl) {
 
 		this.sessionManagementEndpointUrlPrefixSet = sessionManagementEndpointUrlPrefixSet;
+		this.snaaEndpointUrl = snaaEndpointUrl;
 		this.endpointUrlBase = endpointUrlBase.endsWith("/") ? endpointUrlBase : endpointUrlBase + "/";
 		this.sessionManagementEndpointUrl = endpointUrlBase + (path.startsWith("/") ? path.substring(1) : path);
 		this.reservationEndpointUrl = reservationEndpointUrl;
@@ -133,6 +147,14 @@ public class FederatorSessionManagement implements SessionManagement {
 
 	public void stop() throws Exception {
 
+		log.info("Stopping all WSN federator instances...");
+		for (FederatorWSN federatorWSN : instanceCache.values()) {
+			federatorWSN.stop();
+			log.info("Stopped WSN federator instance on {}.", federatorWSN.getWsnEndpointUrl());
+		}
+		log.info("Stopped all WSN federator instances!");
+
+		log.info("Stopping Session Management federator instance on {}...", sessionManagementEndpointUrl);
 		if (sessionManagementEndpoint != null) {
 			sessionManagementEndpoint.stop();
 			log.info("Stopped Session Management federator on {}", sessionManagementEndpointUrl);
@@ -144,7 +166,7 @@ public class FederatorSessionManagement implements SessionManagement {
 
 	private static class GetInstanceCallable implements Callable<GetInstanceCallable.Result> {
 
-		private static class Result {
+		public static class Result {
 
 			public String federatedWSNInstanceEndpointUrl;
 
@@ -290,7 +312,7 @@ public class FederatorSessionManagement implements SessionManagement {
 	/**
 	 * Calculates the set of URN prefixes that are "buried" inside {@code secretReservationKeys}.
 	 *
-	 * @param secretReservationKeys the list of {@link eu.wisebed.testbed.api.wsn.v211.SecretReservationKey} instances
+	 * @param secretReservationKeys the list of {@link eu.wisebed.testbed.api.wsn.v22.SecretReservationKey} instances
 	 *
 	 * @return the set of URN prefixes that are "buried" inside {@code secretReservationKeys}
 	 */
@@ -303,10 +325,10 @@ public class FederatorSessionManagement implements SessionManagement {
 	}
 
 	/**
-	 * Checks for a given list of {@link eu.wisebed.testbed.api.wsn.v211.SecretReservationKey} instances which federated
+	 * Checks for a given list of {@link eu.wisebed.testbed.api.wsn.v22.SecretReservationKey} instances which federated
 	 * Session Management endpoints are responsible for which set of URN prefixes.
 	 *
-	 * @param secretReservationKeys the list of {@link eu.wisebed.testbed.api.wsn.v211.SecretReservationKey} instances as
+	 * @param secretReservationKeys the list of {@link eu.wisebed.testbed.api.wsn.v22.SecretReservationKey} instances as
 	 *                              passed in as parameter e.g. to {@link de.uniluebeck.itm.tr.wsn.federator.FederatorSessionManagement#getInstance(java.util.List,
 	 *							  String)}
 	 *
@@ -446,4 +468,18 @@ public class FederatorSessionManagement implements SessionManagement {
 		}
 
 	}
+
+	@Override
+	public void getConfiguration(
+			@WebParam(name = "rsEndpointUrl", targetNamespace = "", mode = WebParam.Mode.OUT) final
+			Holder<String> rsEndpointUrl,
+			@WebParam(name = "snaaEndpointUrl", targetNamespace = "", mode = WebParam.Mode.OUT) final
+			Holder<String> snaaEndpointUrl,
+			@WebParam(name = "options", targetNamespace = "", mode = WebParam.Mode.OUT) final
+			Holder<List<KeyValuePair>> options) {
+
+		rsEndpointUrl.value = this.reservationEndpointUrl;
+		snaaEndpointUrl.value = this.snaaEndpointUrl;
+	}
+
 }
