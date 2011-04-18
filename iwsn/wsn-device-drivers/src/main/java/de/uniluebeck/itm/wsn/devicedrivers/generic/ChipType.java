@@ -41,6 +41,10 @@ public enum ChipType {
 	 */
 	JN513XR1,
 	/**
+	 * Mode for JN5148 platform
+	 */
+	JN5148,
+	/**
 	 * Mode for Shawn simulator
 	 */
 	Shawn,
