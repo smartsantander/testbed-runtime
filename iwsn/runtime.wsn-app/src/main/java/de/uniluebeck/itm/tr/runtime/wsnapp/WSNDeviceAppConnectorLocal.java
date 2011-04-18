@@ -361,6 +361,10 @@ public class WSNDeviceAppConnectorLocal extends AbstractListenable<WSNDeviceAppC
 
 	private int flashCount = 0;
 
+	private final int timeoutReset;
+
+	private final int timeoutFlash;
+
 	private final int maximumMessageRate;
 
 	private final TimeUnit maximumMessageRateTimeUnit;
@@ -550,8 +554,9 @@ public class WSNDeviceAppConnectorLocal extends AbstractListenable<WSNDeviceAppC
 	private iSenseDevice device;
 
 	public WSNDeviceAppConnectorLocal(final String nodeUrn, final String nodeType, final String nodeUSBChipID,
-									  final String nodeSerialInterface, final Integer nodeAPITimeout,
-									  final Integer maximumMessageRate, final SchedulerService schedulerService) {
+									  final String nodeSerialInterface, final Integer timeoutNodeAPI,
+									  final Integer maximumMessageRate, final SchedulerService schedulerService,
+									  final Integer timeoutReset, final Integer timeoutFlash) {
 
 		this.nodeUrn = nodeUrn;
 		this.nodeType = nodeType;
@@ -563,10 +568,14 @@ public class WSNDeviceAppConnectorLocal extends AbstractListenable<WSNDeviceAppC
 		this.maximumMessageRateTimeUnit = TimeUnit.SECONDS;
 		this.maximumMessageRateLimiter = new RateLimiterImpl(this.maximumMessageRate, 1, maximumMessageRateTimeUnit);
 
-		this.nodeApi =
-				new NodeApi(nodeApiDeviceAdapter, nodeAPITimeout == null ? DEFAULT_NODE_API_TIMEOUT : nodeAPITimeout,
-						TimeUnit.MILLISECONDS
-				);
+		this.nodeApi = new NodeApi(
+				nodeApiDeviceAdapter,
+				(timeoutNodeAPI == null ? DEFAULT_NODE_API_TIMEOUT : timeoutNodeAPI),
+				TimeUnit.MILLISECONDS
+		);
+		this.timeoutReset = timeoutReset == null ? 3000 : timeoutReset;
+		this.timeoutFlash = timeoutFlash == null ? 90000 : timeoutFlash;
+
 	}
 
 	@Override
@@ -784,7 +793,7 @@ public class WSNDeviceAppConnectorLocal extends AbstractListenable<WSNDeviceAppC
 				}
 				state.setState(State.READY);
 			}
-		}, 90, TimeUnit.SECONDS
+		}, timeoutFlash, TimeUnit.MILLISECONDS
 		);
 		// end bugfix
 
@@ -857,7 +866,7 @@ public class WSNDeviceAppConnectorLocal extends AbstractListenable<WSNDeviceAppC
 				}
 				state.setState(State.READY);
 			}
-		}, 3, TimeUnit.SECONDS
+		}, timeoutReset, TimeUnit.MILLISECONDS
 		);
 
 		ResetListener resetListener = new ResetListener(listener, resetCount, resetTimeoutRunnableFuture);
