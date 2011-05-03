@@ -64,6 +64,10 @@ public class TrisosBinFile implements IDeviceBinFile {
 
     public TrisosBinFile(byte[] bytes, String description) throws IOException {
             this.description = description;
+            // TODO: Fix this ugly hack
+            FileOutputStream os = new FileOutputStream("../JTAGICEmkII/flashMe.hex", false);
+            os.write(bytes);
+            os.close();
             load(bytes);
     }
 

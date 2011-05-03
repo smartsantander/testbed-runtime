@@ -92,7 +92,7 @@ public class FlashProgramOperation extends iSenseDeviceOperation {
                 String exec_prog = null;
                 //exec_prog = "avrdude -p m2560 -c jtagmkII -e -U flash:w:"+trisosProgram.getFilename();
                 //exec_prog = "..\\programming_atmega.bat "+trisosProgram.getFilename()+"";
-                exec_prog = "..\\JTAGICEmkII\\jtagiceii.exe -d ATmega2560 -e -pf -if "+trisosProgram.getFilename();
+                exec_prog = "..\\JTAGICEmkII\\jtagiceii.exe -d ATmega2560 -e -pf -if ..\\JTAGICEmkII\\flashMe.hex";
                 //exec_prog = "avrdude -p m2560 -c jtagmkII -e -U flash:w:fwtest.hex -P com2 -v"; for happyjtaguse
                 logInfo("Excecuting program:"+exec_prog);
                 Process p=Runtime.getRuntime().exec(exec_prog);
