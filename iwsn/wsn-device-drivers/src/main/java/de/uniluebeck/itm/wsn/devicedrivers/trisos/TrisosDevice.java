@@ -31,6 +31,7 @@ import de.uniluebeck.itm.wsn.devicedrivers.jennic.Sectors.SectorIndex;
 import gnu.io.*;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
+import java.io.ByteArrayOutputStream;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -447,7 +448,24 @@ public class TrisosDevice extends iSenseDeviceImpl implements SerialPortEventLis
 				}
 
 				if (operation == null) {
-					receive(inputStream);
+					//receive(inputStream);
+                                    try{
+                                        byte c = 0x00;
+                                        ByteArrayOutputStream byteOs = new ByteArrayOutputStream();
+                                        while( (c = (byte)(0xff & inputStream.read())) != '\r' )
+                                        {
+                                            if(c != '\r' || c != '\n')
+                                                byteOs.write((int)c);
+                                            else
+                                                continue;
+                                        }
+                                        MessagePacket p = new MessagePacket(PacketTypes.LOG, byteOs.toByteArray());
+                                        notifyReceivePacket(p);
+                                    }
+                                    catch(Exception e)
+                                    {
+                                        logError(logIdentifier, e);
+                                    }
 				} 
 
 				break;
