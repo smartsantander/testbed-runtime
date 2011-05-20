@@ -34,6 +34,7 @@ import org.slf4j.LoggerFactory;
 import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Properties;
 import java.util.StringTokenizer;
 
 
@@ -65,7 +66,13 @@ public class TrisosBinFile implements IDeviceBinFile {
     public TrisosBinFile(byte[] bytes, String description) throws IOException {
             this.description = description;
             // TODO: Fix this ugly hack
-            FileOutputStream os = new FileOutputStream("../JTAGICEmkII/flashMe.hex", false);
+            //FileOutputStream os = new FileOutputStream("../JTAGICEmkII/flashMe.elf", false);
+            Properties props = new Properties();
+            FileInputStream in = new FileInputStream("../conf/trisos-device-config.properties");
+            props.load(in);
+            in.close();
+            String binFileName = props.getProperty("trisos.programmer.binfile");
+            FileOutputStream os = new FileOutputStream(new File(binFileName));
             os.write(bytes);
             os.close();
             load(bytes);

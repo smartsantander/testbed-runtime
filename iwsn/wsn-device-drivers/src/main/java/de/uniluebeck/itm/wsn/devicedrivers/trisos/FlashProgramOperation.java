@@ -30,7 +30,9 @@ import de.uniluebeck.itm.wsn.devicedrivers.exceptions.InvalidChecksumException;
 import de.uniluebeck.itm.wsn.devicedrivers.exceptions.ProgramChipMismatchException;
 import de.uniluebeck.itm.wsn.devicedrivers.generic.*;
 import java.io.BufferedReader;
+import java.io.FileInputStream;
 import java.io.InputStreamReader;
+import java.util.Properties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -89,30 +91,54 @@ public class FlashProgramOperation extends iSenseDeviceOperation {
 
 
                 //Call programming tool right here  
-                String exec_prog = null;
+                //String exec_prog = null;
                 //exec_prog = "avrdude -p m2560 -c jtagmkII -e -U flash:w:"+trisosProgram.getFilename();
                 //exec_prog = "..\\programming_atmega.bat "+trisosProgram.getFilename()+"";
-                exec_prog = "..\\JTAGICEmkII\\jtagiceii.exe -d ATmega2560 -e -pf -if ..\\JTAGICEmkII\\flashMe.hex";
+                //exec_prog = "..\\JTAGICEmkII\\jtagiceii.exe -d ATmega2560 -e -pa -ia ..\\JTAGICEmkII\\flashMe.elf";
                 //exec_prog = "avrdude -p m2560 -c jtagmkII -e -U flash:w:fwtest.hex -P com2 -v"; for happyjtaguse
-                logInfo("Excecuting program:"+exec_prog);
-                Process p=Runtime.getRuntime().exec(exec_prog);
-                BufferedReader process_in = new BufferedReader(new InputStreamReader(p.getInputStream()));
-                BufferedReader process_err = new BufferedReader(new InputStreamReader(p.getErrorStream()));
+
+                /* Fetching properties */
+                Properties props = new Properties();
+                FileInputStream in = new FileInputStream("../conf/trisos-device-config.properties");
+                props.load(in);
+                in.close();
+
+                /* Counting parameters for the programmer executable */
+                int numberOfParms = 0;
+		for(; props.getProperty("trisos.programmer.param_" + numberOfParms) != null; ++numberOfParms){;}
+
+                /* Assemble command array */
+		String command[] = new String[numberOfParms + 1];
+		command[0] = props.getProperty("trisos.programmer.command");
+                /* Fetching name of the file to be flashed on the nodes */
+		String binFileName = props.getProperty("trisos.programmer.binfile");
+                /* Assemble command array */
+                for( int i = 0; i < numberOfParms; ++i ) {
+			command[i + 1] = props.getProperty("trisos.programmer.param_" + i);
+			command[i + 1] = command[i + 1].replace("trisos.programmer.binfile", binFileName);
+		}
+                /* Assembling command for debug output */
+                String debugString = "";
+                for(int i = 0; i < command.length; ++i)
+                    debugString += command[i] + " ";
+                logDebug("Execute: " + debugString);
+                /* Execute command */
+                Process p = Runtime.getRuntime().exec(command);
+		BufferedReader process_in = new BufferedReader(new InputStreamReader(p.getInputStream()));
+                //BufferedReader process_err = new BufferedReader(new InputStreamReader(p.getErrorStream()));
                 String line = null;
 
-/*                logInfo("Print Error Stream");
-                while( (line=process_err.readLine())!=null )
+                /* Had to comment this out because system stops */
+                /*while( (line=process_err.readLine())!=null )
                 {
-                   System.out.println(line);
-                }
-*/
-                logInfo("Print Normal Stream");
+                    System.out.println(line);
+                }*/
+
                 while( (line=process_in.readLine())!=null )
                 {
-                   System.out.println(line);
+                    logDebug(line);
                 }
-
-                logInfo("Quit program execution");
+                
                 p.destroy();
                 
 		return true;
