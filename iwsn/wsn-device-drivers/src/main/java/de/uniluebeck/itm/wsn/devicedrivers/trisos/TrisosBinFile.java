@@ -63,15 +63,17 @@ public class TrisosBinFile implements IDeviceBinFile {
 
     private int length = -1;
 
+    protected TrisosBinFile() throws IOException {
+            // TODO: Do nothing here?
+    }
+
     public TrisosBinFile(byte[] bytes, String description) throws IOException {
             this.description = description;
-            // TODO: Fix this ugly hack
-            //FileOutputStream os = new FileOutputStream("../JTAGICEmkII/flashMe.elf", false);
             Properties props = new Properties();
             FileInputStream in = new FileInputStream("../conf/trisos-device-config.properties");
             props.load(in);
             in.close();
-            String binFileName = props.getProperty("trisos.programmer.binfile");
+            String binFileName = props.getProperty("trisos.programmer.program.binfile");
             FileOutputStream os = new FileOutputStream(new File(binFileName));
             os.write(bytes);
             os.close();
@@ -146,27 +148,31 @@ public class TrisosBinFile implements IDeviceBinFile {
 
     @Override
     public void resetBlockIterator() {
-        throw new UnsupportedOperationException("Not supported yet(resetBlockIterator)");
+        System.err.println("Trisos resetBlockIterator called");
     }
 
     @Override
     public boolean hasNextBlock() {
-        throw new UnsupportedOperationException("Not supported yet(hasNextBlock)");
+        System.err.println("Trisos hasNextBlock called");
+        return true;
     }
 
     @Override
     public BinFileDataBlock getNextBlock() {
-        throw new UnsupportedOperationException("Not supported yet(getNextBlock)");
+        System.err.println("Trisos getNextBlock called");
+        return null;
     }
 
     @Override
     public int getBlockCount() {
-        throw new UnsupportedOperationException("Not supported yet(getBlockCount)");
+        System.err.println("Trisos getBlockCount called");
+        return -1;
     }
 
     @Override
     public int getLength() {
-        throw new UnsupportedOperationException("Not supported yet(getLength)");
+        System.err.println("Trisos getLength called");
+        return -1;
     }
 
     public File getFile()

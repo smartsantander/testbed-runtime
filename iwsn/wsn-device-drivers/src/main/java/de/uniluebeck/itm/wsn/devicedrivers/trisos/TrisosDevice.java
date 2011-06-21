@@ -36,8 +36,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.Enumeration;
-import java.util.TooManyListenersException;
 
 
 public class TrisosDevice extends iSenseDeviceImpl implements SerialPortEventListener {
@@ -58,6 +56,7 @@ public class TrisosDevice extends iSenseDeviceImpl implements SerialPortEventLis
 	private static final int MAX_RETRIES = 5;
         private boolean connected;
         private Object dataAvailableMonitor = new Object();
+        //private IDeviceBinFile program = null;
 
 
 
@@ -142,12 +141,12 @@ public class TrisosDevice extends iSenseDeviceImpl implements SerialPortEventLis
 
     @Override
     public void send(MessagePacket p) throws Exception {
-        throw new UnsupportedOperationException("Not supported yet.");
+        logDebug("TrisosDevice send called");
     }
 
     @Override
     public void leaveProgrammingMode() throws Exception {
-        throw new UnsupportedOperationException("Not supported yet.");
+        logDebug("TrisosDevice leaveProgrammingMode called");
     }
 
     @Override
@@ -161,29 +160,30 @@ public class TrisosDevice extends iSenseDeviceImpl implements SerialPortEventLis
 
     @Override
     public boolean reset() throws Exception {
-        throw new UnsupportedOperationException("Not supported yet.");
+        logDebug("TrisosDevice reset called");
+        return true;
     }
 
     @Override
     public boolean enterProgrammingMode() throws Exception {
-        //throw new UnsupportedOperationException("Not supported yet.");
         logDebug("Switched to ProgrammingMode on TrisosDevice");
         return true;
     }
 
     @Override
     public void eraseFlash() throws Exception {
-        throw new UnsupportedOperationException("Not supported yet.");
+        logDebug("TrisosDevice eraseFlash called");
     }
 
     @Override
     public void eraseFlash(SectorIndex sector) throws Exception {
-        throw new UnsupportedOperationException("Not supported yet.");
+        logDebug("TrisosDevice eraseFlash called");
     }
 
     @Override
     public byte[] writeFlash(int address, byte[] bytes, int offset, int len) throws Exception {
-        throw new UnsupportedOperationException("Not supported yet.");
+        logDebug("TrisosDevice writeFlash called");
+        return new byte[bytes.length];
     }
 
     @Override
@@ -347,13 +347,13 @@ public class TrisosDevice extends iSenseDeviceImpl implements SerialPortEventLis
 
     @Override
     public ChipType getChipType() throws Exception {
-        //throw new UnsupportedOperationException("Not supported yet.");
         return ChipType.TRISOS;
     }
 
     @Override
     public FlashType getFlashType() throws Exception {
-        throw new UnsupportedOperationException("Not supported yet.");
+        logDebug("TrisosDevice getFlashType called");
+        return FlashType.Unknown;
     }
 
     @Override
@@ -363,7 +363,7 @@ public class TrisosDevice extends iSenseDeviceImpl implements SerialPortEventLis
                     logError("Already another operation in progress (" + operation + ")");
                     return false;
             }
-
+            
             operation = new FlashProgramOperation(this, program, true);
             operation.setLogIdentifier(logIdentifier);
             operation.start();
@@ -372,7 +372,7 @@ public class TrisosDevice extends iSenseDeviceImpl implements SerialPortEventLis
 
     @Override
     public void triggerSetMacAddress(MacAddress mac, boolean rebootAfterFlashing) throws Exception {
-        throw new UnsupportedOperationException("Not supported yet.");
+        logDebug("TrisosDevice triggerSetMacAddress called");
     }
 
     @Override
@@ -391,7 +391,16 @@ public class TrisosDevice extends iSenseDeviceImpl implements SerialPortEventLis
 
     @Override
     public boolean triggerReboot() throws Exception {
-        throw new UnsupportedOperationException("Not supported yet.");
+        // TODO: Flash for reboot is a hack!
+        if (operationInProgress()) {
+            logError("Already another operation in progress (" + operation + ")");
+            return false;
+        }
+
+        operation = new TrisosResetOperation(this);
+        operation.setLogIdentifier(logIdentifier);
+        operation.start();
+        return true;
     }
 
     @Override

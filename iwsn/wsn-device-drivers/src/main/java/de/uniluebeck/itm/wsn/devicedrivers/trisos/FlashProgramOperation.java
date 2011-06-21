@@ -23,18 +23,12 @@
 
 package de.uniluebeck.itm.wsn.devicedrivers.trisos;
 
-import de.uniluebeck.itm.wsn.devicedrivers.trisos.*;
-import java.io.IOException;
-
-import de.uniluebeck.itm.wsn.devicedrivers.exceptions.InvalidChecksumException;
 import de.uniluebeck.itm.wsn.devicedrivers.exceptions.ProgramChipMismatchException;
 import de.uniluebeck.itm.wsn.devicedrivers.generic.*;
 import java.io.BufferedReader;
 import java.io.FileInputStream;
 import java.io.InputStreamReader;
 import java.util.Properties;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class FlashProgramOperation extends iSenseDeviceOperation {
 
@@ -57,7 +51,7 @@ public class FlashProgramOperation extends iSenseDeviceOperation {
 	 *
 	 */
 	private boolean programFlash() throws Exception {
-		TrisosBinFile trisosProgram = null;
+		//TrisosBinFile trisosProgram = null;
 		// Enter programming mode
 		if (!device.enterProgrammingMode()) {
 			logError("Unable to enter programming mode");
@@ -82,7 +76,7 @@ public class FlashProgramOperation extends iSenseDeviceOperation {
 			throw new ProgramChipMismatchException(chipType, program.getFileType());
 		}
 
-		trisosProgram = (TrisosBinFile) program;
+		//trisosProgram = (TrisosBinFile) program;
 
 
 //		int flash_crc = trisosProgram.calcCRC();
@@ -105,17 +99,19 @@ public class FlashProgramOperation extends iSenseDeviceOperation {
 
                 /* Counting parameters for the programmer executable */
                 int numberOfParms = 0;
-		for(; props.getProperty("trisos.programmer.param_" + numberOfParms) != null; ++numberOfParms){;}
+		for(; props.getProperty("trisos.programmer.program.param." + numberOfParms) != null; ++numberOfParms){;}
 
                 /* Assemble command array */
 		String command[] = new String[numberOfParms + 1];
-		command[0] = props.getProperty("trisos.programmer.command");
+		command[0] = props.getProperty("trisos.programmer.program.command");
+                if( props.containsKey(command[0]) ) command[0] = props.getProperty(command[0]);
                 /* Fetching name of the file to be flashed on the nodes */
-		String binFileName = props.getProperty("trisos.programmer.binfile");
+		String binFileName = props.getProperty("trisos.programmer.program.binfile");
                 /* Assemble command array */
                 for( int i = 0; i < numberOfParms; ++i ) {
-			command[i + 1] = props.getProperty("trisos.programmer.param_" + i);
-			command[i + 1] = command[i + 1].replace("trisos.programmer.binfile", binFileName);
+			command[i + 1] = props.getProperty("trisos.programmer.program.param." + i);
+                        if( props.containsKey(command[i + 1] )) command[i + 1] = props.getProperty(command[i + 1]);
+			command[i + 1] = command[i + 1].replace("trisos.programmer.program.binfile", binFileName);
 		}
                 /* Assembling command for debug output */
                 String debugString = "";
