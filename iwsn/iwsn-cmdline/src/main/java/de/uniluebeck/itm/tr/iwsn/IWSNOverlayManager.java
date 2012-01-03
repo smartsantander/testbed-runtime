@@ -1,12 +1,15 @@
 package de.uniluebeck.itm.tr.iwsn;
 
 import com.google.common.collect.Sets;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import de.uniluebeck.itm.gtr.TestbedRuntime;
 import de.uniluebeck.itm.gtr.naming.NamingEntry;
 import de.uniluebeck.itm.gtr.naming.NamingInterface;
 import de.uniluebeck.itm.gtr.naming.NamingService;
 import de.uniluebeck.itm.gtr.routing.RoutingTableService;
+import de.uniluebeck.itm.tr.util.ExecutorUtils;
 import de.uniluebeck.itm.tr.util.Service;
+import de.uniluebeck.itm.tr.util.Tuple;
 import de.uniluebeck.itm.tr.util.domobserver.DOMObserver;
 import de.uniluebeck.itm.tr.util.domobserver.DOMObserverListener;
 import de.uniluebeck.itm.tr.util.domobserver.DOMTuple;
@@ -17,6 +20,8 @@ import de.uniluebeck.itm.tr.xml.Testbed;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBException;
 import javax.xml.bind.Unmarshaller;
@@ -25,6 +30,8 @@ import javax.xml.xpath.XPathConstants;
 import javax.xml.xpath.XPathExpressionException;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -49,19 +56,17 @@ public class IWSNOverlayManager implements Service {
 		@Override
 		public void onDOMChanged(final DOMTuple oldAndNew) {
 
-			try {
+			if (scheduler != null && !scheduler.isShutdown()) {
 
-				Object oldDOM = oldAndNew.getFirst();
-				Object newDOM = oldAndNew.getSecond();
-
-				Testbed oldConfig = oldDOM == null ? null : unmarshal((org.w3c.dom.Node) oldDOM);
-				Testbed newConfig = newDOM == null ? null : unmarshal((org.w3c.dom.Node) newDOM);
-
-				addAndRemoveOverlayNodes(oldConfig, newConfig);
-				addAndRemoveOverlayNodeNames(oldConfig, newConfig);
-
-			} catch (JAXBException e) {
-				log.error("{}", e);
+				scheduler.execute(new Runnable() {
+					@Override
+					public void run() {
+						onDOMChangedInternal(oldAndNew);
+					}
+				}
+				);
+			} else {
+				onDOMChangedInternal(oldAndNew);
 			}
 		}
 
@@ -80,21 +85,49 @@ public class IWSNOverlayManager implements Service {
 		}
 	};
 
-	private TestbedRuntime overlay;
+	private void onDOMChangedInternal(final DOMTuple oldAndNew) {
+		try {
 
-	private DOMObserver domObserver;
+			Object oldDOM = oldAndNew.getFirst();
+			Object newDOM = oldAndNew.getSecond();
+
+			Testbed oldConfig = oldDOM == null ? null : unmarshal((org.w3c.dom.Node) oldDOM);
+			Testbed newConfig = newDOM == null ? null : unmarshal((org.w3c.dom.Node) newDOM);
+
+			addAndRemoveLocalNodeNames(oldConfig, newConfig);
+			addAndRemoveOverlayNodes(oldConfig, newConfig);
+			addAndRemoveOverlayNodeNames(oldConfig, newConfig);
+			addAndRemoveOverlayServerConnections(oldConfig, newConfig);
+
+		} catch (JAXBException e) {
+			log.error("{}", e);
+		}
+	}
+
+	private final TestbedRuntime overlay;
+
+	private final DOMObserver domObserver;
+
+	private final String nodeId;
 
 	private ScheduledFuture<?> domObserverSchedule;
 
-	IWSNOverlayManager(final TestbedRuntime overlay, final DOMObserver domObserver) {
+	private ScheduledExecutorService scheduler;
+
+	IWSNOverlayManager(final TestbedRuntime overlay, final DOMObserver domObserver, final String nodeId) {
 		this.overlay = overlay;
 		this.domObserver = domObserver;
+		this.nodeId = nodeId;
 	}
 
 	@Override
 	public void start() throws Exception {
+		scheduler = Executors.newScheduledThreadPool(
+				1,
+				new ThreadFactoryBuilder().setNameFormat("OverlayManager-Thread %d").build()
+		);
 		domObserver.addListener(domObserverListener);
-		domObserverSchedule = overlay.getSchedulerService().scheduleWithFixedDelay(domObserver, 0, 3, TimeUnit.SECONDS);
+		domObserverSchedule = scheduler.scheduleWithFixedDelay(domObserver, 0, 3, TimeUnit.SECONDS);
 	}
 
 	@Override
@@ -103,6 +136,38 @@ public class IWSNOverlayManager implements Service {
 			domObserverSchedule.cancel(false);
 		}
 		domObserver.removeListener(domObserverListener);
+		ExecutorUtils.shutdown(scheduler, 1, TimeUnit.SECONDS);
+	}
+
+	private void addAndRemoveLocalNodeNames(final Testbed oldConfig, final Testbed newConfig) {
+
+		Set<String> oldLocalNodeNames = getLocalNodeNames(oldConfig);
+		Set<String> newLocalNodeNames = getLocalNodeNames(newConfig);
+
+		boolean sameLocalNodeNames = oldLocalNodeNames.equals(newLocalNodeNames);
+
+		if (!sameLocalNodeNames) {
+
+			Set<String> localNodeNamesRemoved = newHashSet(Sets.difference(oldLocalNodeNames, newLocalNodeNames));
+			removeLocalNodeNames(localNodeNamesRemoved);
+
+			Set<String> localNodesNamesAdded = newHashSet(Sets.difference(newLocalNodeNames, oldLocalNodeNames));
+			addLocalNodeNames(localNodesNamesAdded);
+
+		}
+
+	}
+
+	private void addLocalNodeNames(final Set<String> localNodesNamesAdded) {
+		for (String localNodeName : localNodesNamesAdded) {
+			overlay.getLocalNodeNameManager().addLocalNodeName(localNodeName);
+		}
+	}
+
+	private void removeLocalNodeNames(final Set<String> localNodeNamesRemoved) {
+		for (String localNodeName : localNodeNamesRemoved) {
+			overlay.getLocalNodeNameManager().removeLocalNodeName(localNodeName);
+		}
 	}
 
 	private void addAndRemoveOverlayNodeNames(final Testbed oldConfig, final Testbed newConfig) {
@@ -120,6 +185,98 @@ public class IWSNOverlayManager implements Service {
 			Set<String> nodesNamesAdded = newHashSet(Sets.difference(newNodeNames, oldNodeNames));
 			addRoutingTableEntries(nodesNamesAdded);
 		}
+	}
+
+	private void addAndRemoveOverlayServerConnections(final Testbed oldConfig, final Testbed newConfig) {
+
+		Set<Tuple<String, String>> oldConnections = getOverlayServerConnections(oldConfig);
+		Set<Tuple<String, String>> newConnections = getOverlayServerConnections(newConfig);
+
+		boolean sameConnections = oldConnections.equals(newConnections);
+
+		if (!sameConnections) {
+
+			Set<Tuple<String, String>> connectionsRemoved = newHashSet(Sets.difference(oldConnections, newConnections));
+			removeOverlayServerConnections(connectionsRemoved);
+
+			Set<Tuple<String, String>> connectionsAdded = newHashSet(Sets.difference(newConnections, oldConnections));
+			addOverlayServerConnections(connectionsAdded);
+
+		}
+	}
+
+	private void addOverlayServerConnections(final Set<Tuple<String, String>> connectionsAdded) {
+
+		for (Tuple<String, String> connectionConfig : connectionsAdded) {
+			try {
+				overlay.getMessageServerService().addMessageServer(
+						connectionConfig.getFirst(),
+						connectionConfig.getSecond()
+				);
+			} catch (Exception e) {
+				log.error("{}", e);
+			}
+		}
+	}
+
+	private void removeOverlayServerConnections(final Set<Tuple<String, String>> connectionsRemoved) {
+
+		for (Tuple<String, String> connectionConfig : connectionsRemoved) {
+			try {
+				overlay.getMessageServerService().removeMessageServer(
+						connectionConfig.getFirst(),
+						connectionConfig.getSecond()
+				);
+			} catch (Exception e) {
+				log.error("{}", e);
+			}
+		}
+	}
+
+	@Nonnull
+	private Set<Tuple<String, String>> getOverlayServerConnections(@Nullable final Testbed config) {
+
+		Set<Tuple<String, String>> connections = newHashSet();
+
+		if (config == null) {
+			return connections;
+		}
+
+		for (Node node : config.getNodes()) {
+			if (nodeId.equals(node.getId())) {
+				if (node.getServerconnections() != null && node.getServerconnections().getServerconnection() != null) {
+					for (ServerConnection serverConnection : node.getServerconnections().getServerconnection()) {
+						connections.add(new Tuple<String, String>(
+								serverConnection.getType(),
+								serverConnection.getAddress()
+						)
+						);
+					}
+				}
+			}
+		}
+
+		return connections;
+	}
+
+	@Nonnull
+	private Set<String> getLocalNodeNames(@Nullable final Testbed config) {
+
+		Set<String> set = newHashSet();
+
+		if (config == null) {
+			return set;
+		}
+
+		for (Node node : config.getNodes()) {
+			if (nodeId.equals(node.getId())) {
+				for (NodeName nodeName : node.getNames().getNodename()) {
+					set.add(nodeName.getName());
+				}
+			}
+		}
+
+		return set;
 	}
 
 	private Set<String> getOverlayNodeNames(final Testbed config) {
@@ -260,6 +417,9 @@ public class IWSNOverlayManager implements Service {
 
 		JAXBContext context = JAXBContext.newInstance(Testbed.class.getPackage().getName());
 		Unmarshaller unmarshaller = context.createUnmarshaller();
-		return unmarshaller.unmarshal(rootNode, Testbed.class).getValue();
+		//noinspection SynchronizationOnLocalVariableOrMethodParameter
+		synchronized (rootNode) {
+			return unmarshaller.unmarshal(rootNode, Testbed.class).getValue();
+		}
 	}
 }

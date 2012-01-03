@@ -1,6 +1,8 @@
 package de.uniluebeck.itm.tr.runtime.wsnapp;
 
 import javax.annotation.Nullable;
+import java.io.File;
+import java.util.Map;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -8,13 +10,15 @@ import static de.uniluebeck.itm.tr.util.StringUtils.assertHexOrDecLongUrnSuffix;
 
 public class WSNDeviceAppConfiguration {
 
-	public static final int DEFAULT_TIMEOUT_FLASH_MILLIS = 120000;
+	private static final int DEFAULT_TIMEOUT_FLASH_MILLIS = 120000;
 
-	public static final int DEFAULT_TIMEOUT_NODE_API_MILLIS = 1000;
+	private static final int DEFAULT_TIMEOUT_NODE_API_MILLIS = 1000;
 
-	public static final int DEFAULT_TIMEOUT_RESET_MILLIS = 3000;
+	private static final int DEFAULT_TIMEOUT_RESET_MILLIS = 3000;
 
-	public static final int DEFAULT_MAXIMUM_MESSAGE_RATE = Integer.MAX_VALUE;
+	private static final int DEFAULT_TIMEOUT_CHECK_ALIVE_MILLIS = 3000;
+
+	private static final int DEFAULT_MAXIMUM_MESSAGE_RATE = Integer.MAX_VALUE;
 
 	public static class Builder {
 
@@ -32,24 +36,22 @@ public class WSNDeviceAppConfiguration {
 			this.configuration = new WSNDeviceAppConfiguration();
 			this.configuration.nodeUrn = nodeUrn;
 			this.configuration.nodeType = nodeType;
-
-			// set defaults
-			this.configuration.maximumMessageRate = DEFAULT_MAXIMUM_MESSAGE_RATE;
-			this.configuration.timeoutFlash = DEFAULT_TIMEOUT_FLASH_MILLIS;
-			this.configuration.timeoutNodeAPI = DEFAULT_TIMEOUT_NODE_API_MILLIS;
-			this.configuration.timeoutReset = DEFAULT_TIMEOUT_RESET_MILLIS;
 		}
 
 		public Builder setMaximumMessageRate(@Nullable final Integer maximumMessageRate) {
+
 			checkArgument((maximumMessageRate == null || maximumMessageRate > 0),
 					"The maximum number of messages per second must either be omitted (null) to use the default value "
 							+ "of " + DEFAULT_MAXIMUM_MESSAGE_RATE + " or be larger than 0 (zero). Configured value: "
 							+ maximumMessageRate
 			);
+
 			assertNotBuiltYet();
-			if (maximumMessageRate != null) {
-				this.configuration.maximumMessageRate = maximumMessageRate;
-			}
+
+			this.configuration.maximumMessageRate = maximumMessageRate != null ?
+					maximumMessageRate :
+					DEFAULT_MAXIMUM_MESSAGE_RATE;
+
 			return this;
 		}
 
@@ -65,42 +67,84 @@ public class WSNDeviceAppConfiguration {
 			return this;
 		}
 
-		public Builder setTimeoutFlash(@Nullable final Integer timeoutFlash) {
+		public Builder setConfiguration(@Nullable final Map<String, String> configuration) {
+			assertNotBuiltYet();
+			this.configuration.deviceConfiguration = configuration;
+			return this;
+		}
+
+		public Builder setDefaultChannelPipelineConfigurationFile(
+				@Nullable final File defaultChannelPipelineConfigurationFile) {
+			assertNotBuiltYet();
+			this.configuration.defaultChannelPipelineConfigurationFile = defaultChannelPipelineConfigurationFile;
+			return this;
+		}
+
+		public Builder setTimeoutFlashMillis(@Nullable final Integer timeoutFlash) {
+
 			checkArgument((timeoutFlash == null || timeoutFlash > 0),
 					"The timeout value for the flash operation must either be omitted (null) to use the default "
 							+ "value of " + DEFAULT_TIMEOUT_FLASH_MILLIS + " ms or be larger than 0 (zero). Configured "
 							+ "value: " + timeoutFlash
 			);
+
 			assertNotBuiltYet();
-			if (timeoutFlash != null) {
-				this.configuration.timeoutFlash = timeoutFlash;
-			}
+
+			this.configuration.timeoutFlashMillis = timeoutFlash != null ?
+					timeoutFlash :
+					DEFAULT_TIMEOUT_FLASH_MILLIS;
+
 			return this;
 		}
 
-		public Builder setTimeoutNodeAPI(@Nullable final Integer timeoutNodeAPI) {
+		public Builder setTimeoutNodeApiMillis(@Nullable final Integer timeoutNodeAPI) {
+
 			checkArgument((timeoutNodeAPI == null || timeoutNodeAPI > 0),
 					"The timeout value for the Node API must either be omitted (null) to use the default value of " +
 							DEFAULT_TIMEOUT_NODE_API_MILLIS + " ms or be larger than 0 (zero). Configured value: " +
 							timeoutNodeAPI
 			);
+
 			assertNotBuiltYet();
-			if (timeoutNodeAPI != null) {
-				this.configuration.timeoutNodeAPI = timeoutNodeAPI;
-			}
+
+			this.configuration.timeoutNodeApiMillis = timeoutNodeAPI != null ?
+					timeoutNodeAPI :
+					DEFAULT_TIMEOUT_NODE_API_MILLIS;
+
 			return this;
 		}
 
-		public Builder setTimeoutReset(@Nullable final Integer timeoutReset) {
+		public Builder setTimeoutResetMillis(@Nullable final Integer timeoutReset) {
+
 			checkArgument((timeoutReset == null || timeoutReset > 0),
 					"The timeout value for the reset operation must either be omitted (null) to use the default value "
-							+ "of " + DEFAULT_MAXIMUM_MESSAGE_RATE + " ms or be larger than 0 (zero). Configured "
+							+ "of " + DEFAULT_TIMEOUT_RESET_MILLIS + " ms or be larger than 0 (zero). Configured "
 							+ "value: " + timeoutReset
 			);
+
 			assertNotBuiltYet();
-			if (timeoutReset != null) {
-				this.configuration.timeoutReset = timeoutReset;
-			}
+
+			this.configuration.timeoutResetMillis = timeoutReset != null ?
+					timeoutReset :
+					DEFAULT_TIMEOUT_RESET_MILLIS;
+
+			return this;
+		}
+
+		public Builder setTimeoutCheckAliveMillis(@Nullable final Integer timeoutCheckAliveMillis) {
+
+			checkArgument((timeoutCheckAliveMillis == null || timeoutCheckAliveMillis > 0),
+					"The timeout value for the checkAlive operation must either be omitted (null) to use the default value "
+							+ "of " + DEFAULT_TIMEOUT_CHECK_ALIVE_MILLIS + " ms or be larger than 0 (zero). Configured "
+							+ "value: " + timeoutCheckAliveMillis
+			);
+
+			assertNotBuiltYet();
+
+			this.configuration.timeoutCheckAliveMillis = timeoutCheckAliveMillis != null ?
+					timeoutCheckAliveMillis :
+					DEFAULT_TIMEOUT_CHECK_ALIVE_MILLIS;
+
 			return this;
 		}
 
@@ -117,6 +161,10 @@ public class WSNDeviceAppConfiguration {
 		}
 	}
 
+	private File defaultChannelPipelineConfigurationFile;
+
+	private Map<String, String> deviceConfiguration;
+
 	private String nodeUrn;
 
 	private String nodeType;
@@ -125,19 +173,21 @@ public class WSNDeviceAppConfiguration {
 
 	private String nodeUSBChipID;
 
-	private int timeoutNodeAPI;
+	private int timeoutNodeApiMillis = DEFAULT_TIMEOUT_NODE_API_MILLIS;
 
-	private int maximumMessageRate;
+	private int maximumMessageRate = DEFAULT_MAXIMUM_MESSAGE_RATE;
 
-	private int timeoutReset;
+	private int timeoutResetMillis = DEFAULT_TIMEOUT_RESET_MILLIS;
 
-	private int timeoutFlash;
+	private int timeoutFlashMillis = DEFAULT_TIMEOUT_FLASH_MILLIS;
+
+	private int timeoutCheckAliveMillis = DEFAULT_TIMEOUT_CHECK_ALIVE_MILLIS;
 
 	public static Builder builder(final String nodeUrn, final String nodeType) {
 		return new Builder(nodeUrn, nodeType);
 	}
 
-	public Integer getMaximumMessageRate() {
+	public int getMaximumMessageRate() {
 		return maximumMessageRate;
 	}
 
@@ -157,15 +207,29 @@ public class WSNDeviceAppConfiguration {
 		return nodeUSBChipID;
 	}
 
-	public Integer getTimeoutFlash() {
-		return timeoutFlash;
+	public int getTimeoutFlashMillis() {
+		return timeoutFlashMillis;
 	}
 
-	public Integer getTimeoutNodeAPI() {
-		return timeoutNodeAPI;
+	public int getTimeoutNodeApiMillis() {
+		return timeoutNodeApiMillis;
 	}
 
-	public Integer getTimeoutReset() {
-		return timeoutReset;
+	public int getTimeoutResetMillis() {
+		return timeoutResetMillis;
+	}
+
+	public int getTimeoutCheckAliveMillis() {
+		return timeoutCheckAliveMillis;
+	}
+
+	@Nullable
+	public Map<String, String> getDeviceConfiguration() {
+		return deviceConfiguration;
+	}
+
+	@Nullable
+	public File getDefaultChannelPipelineConfigurationFile() {
+		return defaultChannelPipelineConfigurationFile;
 	}
 }

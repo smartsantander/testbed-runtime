@@ -1,9 +1,11 @@
 package de.uniluebeck.itm.tr.iwsn;
 
 import com.google.common.collect.Sets;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import de.uniluebeck.itm.gtr.TestbedRuntime;
 import de.uniluebeck.itm.gtr.application.TestbedApplication;
 import de.uniluebeck.itm.gtr.application.TestbedApplicationFactory;
+import de.uniluebeck.itm.tr.util.ExecutorUtils;
 import de.uniluebeck.itm.tr.util.Service;
 import de.uniluebeck.itm.tr.util.domobserver.DOMObserver;
 import de.uniluebeck.itm.tr.util.domobserver.DOMObserverListener;
@@ -13,7 +15,6 @@ import de.uniluebeck.itm.tr.xml.Testbed;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.w3c.dom.Node;
-import org.w3c.dom.NodeList;
 
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBException;
@@ -24,25 +25,23 @@ import javax.xml.xpath.XPathExpressionException;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Throwables.getStackTraceAsString;
-import static com.google.common.collect.Lists.newArrayList;
 import static com.google.common.collect.Maps.newHashMap;
 import static com.google.common.collect.Sets.newHashSet;
 
 public class IWSNApplicationManager implements DOMObserverListener, Service {
 
-	public static final String INJECTION_CONFIGURATION_NODE_ID =
-			"de.uniluebeck.itm.tr.iwsn.IWSNApplicationManager/configurationNodeId";
-
 	private static final Logger log = LoggerFactory.getLogger(IWSNApplicationManager.class);
 
 	private final Map<String, TestbedApplication> applications = newHashMap();
 
-	private final TestbedRuntime overlay;
+	private final TestbedRuntime testbedRuntime;
 
 	private final DOMObserver domObserver;
 
@@ -50,34 +49,51 @@ public class IWSNApplicationManager implements DOMObserverListener, Service {
 
 	private ScheduledFuture<?> domObserverSchedule;
 
-	IWSNApplicationManager(final TestbedRuntime overlay, final DOMObserver domObserver,
+	private ScheduledExecutorService scheduler;
+
+	IWSNApplicationManager(final TestbedRuntime testbedRuntime, final DOMObserver domObserver,
 						   final String configurationNodeId) {
 
 		this.domObserver = domObserver;
-		this.overlay = overlay;
+		this.testbedRuntime = testbedRuntime;
 		this.configurationNodeId = configurationNodeId;
 	}
 
 	@Override
 	public QName getQName() {
-		return XPathConstants.NODESET;
+		return XPathConstants.NODE;
 	}
 
 	@Override
 	public String getXPathExpression() {
-		return "//nodes[@id=\"" + configurationNodeId + "\"]/applications/*";
+		return "/*";
 	}
 
 	@Override
 	public void onDOMChanged(final DOMTuple oldAndNew) {
 
+		if (scheduler != null && !scheduler.isShutdown()) {
+
+			scheduler.execute(new Runnable() {
+				@Override
+				public void run() {
+					onDOMChangedInternal(oldAndNew);
+				}
+			}
+			);
+		} else {
+			onDOMChangedInternal(oldAndNew);
+		}
+	}
+
+	private void onDOMChangedInternal(final DOMTuple oldAndNew) {
 		try {
 
 			Object oldDOM = oldAndNew.getFirst();
 			Object newDOM = oldAndNew.getSecond();
 
-			List<Application> oldApplicationList = oldDOM == null ? null : unmarshal((NodeList) oldDOM);
-			List<Application> newApplicationList = newDOM == null ? null : unmarshal((NodeList) newDOM);
+			List<Application> oldApplicationList = oldDOM == null ? null : unmarshal((Node) oldDOM);
+			List<Application> newApplicationList = newDOM == null ? null : unmarshal((Node) newDOM);
 
 			Set<String> oldApplications = getApplicationNames(oldApplicationList);
 			Set<String> newApplications = getApplicationNames(newApplicationList);
@@ -91,10 +107,10 @@ public class IWSNApplicationManager implements DOMObserverListener, Service {
 			Set<String> addedApplications = newHashSet(Sets.difference(newApplications, oldApplications));
 			startApplications(newApplicationList, addedApplications);
 
-		} catch (JAXBException e) {
+		} catch (Exception e) {
+			log.error("Exception while processing runtime configuration changes: {}", getStackTraceAsString(e));
 			throw new RuntimeException(e);
 		}
-
 	}
 
 	@Override
@@ -129,7 +145,10 @@ public class IWSNApplicationManager implements DOMObserverListener, Service {
 
 			final boolean nameChanged = !oldApplicationName.equals(newApplicationName);
 			final boolean factoryClassChanged = !oldApplicationFactory.equals(newApplicationFactory);
-			final boolean configurationChanged = !oldApplicationConfig.isEqualNode(newApplicationConfig);
+			final boolean configurationChanged =
+					(oldApplicationConfig == null && newApplicationConfig != null) ||
+							(oldApplicationConfig != null && newApplicationConfig == null) ||
+							(oldApplicationConfig != null && !oldApplicationConfig.isEqualNode(newApplicationConfig));
 
 			checkState(applications.containsKey(oldApplicationName));
 
@@ -174,22 +193,35 @@ public class IWSNApplicationManager implements DOMObserverListener, Service {
 		}
 
 		for (Application application : applicationList) {
+
+			if (set.contains(application.getName())) {
+				log.warn("An application with the name \"{}\" already exists. Please make sure each application tag "
+						+ "has a unique name!", application.getName()
+				);
+			}
+
 			set.add(application.getName());
 		}
 		return set;
 	}
 
-	private List<Application> unmarshal(final NodeList nodeList) throws JAXBException {
+	private List<Application> unmarshal(final Node rootNode) throws JAXBException {
 
 		JAXBContext context = JAXBContext.newInstance(Testbed.class.getPackage().getName());
 		Unmarshaller unmarshaller = context.createUnmarshaller();
-
-		List<Application> objects = newArrayList();
-		for (int i = 0; i < nodeList.getLength(); i++) {
-			Node item = nodeList.item(i);
-			objects.add(unmarshaller.unmarshal(item, Application.class).getValue());
+		Testbed testbed;
+		//noinspection SynchronizationOnLocalVariableOrMethodParameter
+		synchronized (rootNode) {
+			testbed = unmarshaller.unmarshal(rootNode, Testbed.class).getValue();
 		}
-		return objects;
+
+		for (de.uniluebeck.itm.tr.xml.Node node : testbed.getNodes()) {
+			if (configurationNodeId.equals(node.getId())) {
+				return node.getApplications().getApplication();
+			}
+		}
+
+		throw new RuntimeException("No configuration found for overlay node id " + configurationNodeId + "!");
 	}
 
 	private void startApplication(Application applicationXml) {
@@ -210,7 +242,7 @@ public class IWSNApplicationManager implements DOMObserverListener, Service {
 
 			log.debug("Creating application \"{}\"", applicationName);
 			TestbedApplication application = applicationFactory.create(
-					overlay,
+					testbedRuntime,
 					applicationName,
 					applicationConfig
 			);
@@ -246,15 +278,29 @@ public class IWSNApplicationManager implements DOMObserverListener, Service {
 
 	@Override
 	public void start() throws Exception {
+		scheduler = Executors.newScheduledThreadPool(
+				1,
+				new ThreadFactoryBuilder().setNameFormat("ApplicationManager-Thread %d").build()
+		);
 		domObserver.addListener(this);
-		domObserverSchedule = overlay.getSchedulerService().scheduleWithFixedDelay(domObserver, 0, 3, TimeUnit.SECONDS);
+		domObserverSchedule = scheduler.scheduleWithFixedDelay(domObserver, 0, 3, TimeUnit.SECONDS);
 	}
 
 	@Override
 	public void stop() {
+		for (TestbedApplication testbedApplication : applications.values()) {
+			try {
+				testbedApplication.stop();
+			} catch (Exception e) {
+				log.warn("TestbedApplication \"{}\" threw an Exception during shutdown: {}",
+						testbedApplication.getName(), e
+				);
+			}
+		}
 		if (domObserverSchedule != null) {
 			domObserverSchedule.cancel(false);
 		}
 		domObserver.removeListener(this);
+		ExecutorUtils.shutdown(scheduler, 1, TimeUnit.SECONDS);
 	}
 }

@@ -2,7 +2,9 @@ package de.uniluebeck.itm.tr.iwsn;
 
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
+import de.uniluebeck.itm.gtr.LocalNodeNameManager;
 import de.uniluebeck.itm.gtr.TestbedRuntime;
+import de.uniluebeck.itm.gtr.messaging.server.MessageServerService;
 import de.uniluebeck.itm.gtr.naming.NamingEntry;
 import de.uniluebeck.itm.gtr.naming.NamingService;
 import de.uniluebeck.itm.gtr.routing.RoutingTableService;
@@ -33,14 +35,17 @@ import static org.mockito.Mockito.*;
 @RunWith(MockitoJUnitRunner.class)
 public class IWSNOverlayManagerTest {
 
-	static {
-		Logging.setLoggingDefaults(Level.DEBUG);
-	}
+	private static final String ONE_NODE_ONE_NAME_NO_APPS =
+			"de/uniluebeck/itm/tr/iwsn/cmdline/config-one-node-one-name-no-apps.xml";
+
+	private static final String ONE_NODE_TWO_NAMES_NO_APPS =
+			"de/uniluebeck/itm/tr/iwsn/cmdline/config-one-node-two-names-no-apps.xml";
+
+	private static final String TWO_NODES_ONE_NAME_NO_APPS =
+			"de/uniluebeck/itm/tr/iwsn/cmdline/config-two-nodes-one-name-no-apps.xml";
 
 	@Mock
 	private DOMObserver domObserverMock;
-
-	private IWSNOverlayManager listener;
 
 	@Mock
 	private TestbedRuntime testbedRuntimeMock;
@@ -51,14 +56,13 @@ public class IWSNOverlayManagerTest {
 	@Mock
 	private RoutingTableService routingTableService;
 
-	private static final String ONE_NODE_ONE_NAME_NO_APPS =
-			"de/uniluebeck/itm/tr/iwsn/cmdline/config-one-node-one-name-no-apps.xml";
+	@Mock
+	private LocalNodeNameManager localNodeNameManagerMock;
 
-	private static final String ONE_NODE_TWO_NAMES_NO_APPS =
-			"de/uniluebeck/itm/tr/iwsn/cmdline/config-one-node-two-names-no-apps.xml";
+	@Mock
+	private MessageServerService messageServerServiceMock;
 
-	private static final String TWO_NODES_ONE_NAME_NO_APPS =
-			"de/uniluebeck/itm/tr/iwsn/cmdline/config-two-nodes-one-name-no-apps.xml";
+	private IWSNOverlayManager listener;
 
 	private Object newDOM;
 
@@ -73,10 +77,12 @@ public class IWSNOverlayManagerTest {
 				bind(IWSNOverlayManagerFactory.class).to(IWSNOverlayManagerFactoryImpl.class);
 			}
 		}
-		).getInstance(IWSNOverlayManagerFactory.class).create(domObserverMock);
+		).getInstance(IWSNOverlayManagerFactory.class).create(testbedRuntimeMock, domObserverMock, "localhost");
 
 		when(testbedRuntimeMock.getNamingService()).thenReturn(namingServiceMock);
 		when(testbedRuntimeMock.getRoutingTableService()).thenReturn(routingTableService);
+		when(testbedRuntimeMock.getLocalNodeNameManager()).thenReturn(localNodeNameManagerMock);
+		when(testbedRuntimeMock.getMessageServerService()).thenReturn(messageServerServiceMock);
 	}
 
 	@Test
