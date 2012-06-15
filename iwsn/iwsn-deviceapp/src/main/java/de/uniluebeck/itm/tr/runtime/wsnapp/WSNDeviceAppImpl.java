@@ -282,6 +282,13 @@ class WSNDeviceAppImpl implements WSNDeviceApp {
 				connector.isNodeAlive(callback);
 				break;
 
+			case ARE_NODES_ALIVE_SM:
+				log.trace("{} => WSNDeviceAppImpl.executeOperation --> checkAreNodesAliveSm()",
+						configuration.getNodeUrn()
+				);
+				connector.isNodeAliveSm(callback);
+				break;
+
 			case DESTROY_VIRTUAL_LINK:
 				log.trace("{} => WSNDeviceAppImpl.executeOperation --> destroyVirtualLink()",
 						configuration.getNodeUrn()
@@ -390,6 +397,13 @@ class WSNDeviceAppImpl implements WSNDeviceApp {
 				}
 				break;
 
+			case SET_DEFAULT_CHANNEL_PIPELINE:
+				log.trace("{} => WSNDeviceAppImpl.executeOperation --> setDefaultChannelPipeline()",
+						configuration.getNodeUrn()
+				);
+				executeSetDefaultChannelPipeline(callback);
+				break;
+
 			case SET_CHANNEL_PIPELINE:
 				log.trace("{} => WSNDeviceAppImpl.executeOperation --> setChannelPipeline()",
 						configuration.getNodeUrn()
@@ -452,6 +466,10 @@ class WSNDeviceAppImpl implements WSNDeviceApp {
 			);
 			nodeMessageListeners.remove(management.getNodeName());
 		}
+	}
+
+	private void executeSetDefaultChannelPipeline(final ReplyingNodeApiCallback callback) {
+		connector.setDefaultChannelPipeline(callback);
 	}
 
 	private void executeSetChannelPipeline(final WSNAppMessages.SetChannelPipelineRequest request,

@@ -29,7 +29,7 @@
 	<parent>
 		<groupId>de.uniluebeck.itm</groupId>
 		<artifactId>tr.iwsn</artifactId>
-		<version>0.9-SNAPSHOT</version>
+		<version>0.8.2</version>
 		<relativePath>../</relativePath>
 	</parent>
 
@@ -40,16 +40,17 @@
 	<dependencies>
 
 		<dependency>
+			<groupId>eu.wisebed</groupId>
+			<artifactId>api</artifactId>
+		</dependency>
+
+		<dependency>
 			<groupId>de.uniluebeck.itm</groupId>
-			<artifactId>tr.wsn-api</artifactId>
+			<artifactId>tr.iwsn-common</artifactId>
 		</dependency>
 		<dependency>
 			<groupId>de.uniluebeck.itm</groupId>
 			<artifactId>tr.overlay</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>de.uniluebeck.itm</groupId>
-			<artifactId>tr.rs-api</artifactId>
 		</dependency>
 		<dependency>
 			<groupId>de.uniluebeck.itm</groupId>

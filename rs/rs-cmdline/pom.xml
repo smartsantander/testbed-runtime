@@ -29,7 +29,7 @@
 	<parent>
 		<groupId>de.uniluebeck.itm</groupId>
 		<artifactId>tr</artifactId>
-		<version>0.9-SNAPSHOT</version>
+		<version>0.8.2</version>
 		<relativePath>../../</relativePath>
 	</parent>
 
@@ -40,9 +40,10 @@
 	<dependencies>
 
 		<dependency>
-			<groupId>de.uniluebeck.itm</groupId>
-			<artifactId>tr.snaa-api</artifactId>
+			<groupId>eu.wisebed</groupId>
+			<artifactId>api</artifactId>
 		</dependency>
+
 		<dependency>
 			<groupId>de.uniluebeck.itm</groupId>
 			<artifactId>tr.rs-dummy</artifactId>
@@ -61,18 +62,6 @@
 		</dependency>
 		<dependency>
 			<groupId>de.uniluebeck.itm</groupId>
-			<artifactId>tr.rs-persistence-inmemory</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>de.uniluebeck.itm</groupId>
-			<artifactId>tr.rs-persistence-gcal</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>de.uniluebeck.itm</groupId>
-			<artifactId>tr.rs-persistence-jpa</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>de.uniluebeck.itm</groupId>
 			<artifactId>tr.snaa-wisebed</artifactId>
 		</dependency>
 		<dependency>
@@ -81,15 +70,7 @@
 		</dependency>
 		<dependency>
 			<groupId>de.uniluebeck.itm</groupId>
-			<artifactId>tr.rs-api</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>de.uniluebeck.itm</groupId>
 			<artifactId>tr.snaa-shibboleth</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>de.uniluebeck.itm</groupId>
-			<artifactId>tr.wsn-api</artifactId>
 		</dependency>
 		<dependency>
 			<groupId>de.uniluebeck.itm</groupId>
@@ -164,7 +145,7 @@
 					</descriptors>
 					<archive>
 						<manifest>
-							<mainClass>de.uniluebeck.itm.tr.rs.cmdline.RSServer</mainClass>
+							<mainClass>de.uniluebeck.itm.tr.snaa.cmdline.RSServer</mainClass>
 						</manifest>
 					</archive>
 				</configuration>

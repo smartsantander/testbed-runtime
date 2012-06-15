@@ -29,7 +29,7 @@
 	<parent>
 		<groupId>de.uniluebeck.itm</groupId>
 		<artifactId>tr</artifactId>
-		<version>0.9-SNAPSHOT</version>
+		<version>0.8.2</version>
 		<relativePath>../../</relativePath>
 	</parent>
 
@@ -40,20 +40,13 @@
 	<dependencies>
 
 		<dependency>
-			<groupId>de.uniluebeck.itm</groupId>
-			<artifactId>tr.rs-api</artifactId>
+			<groupId>eu.wisebed</groupId>
+			<artifactId>api</artifactId>
 		</dependency>
+
 		<dependency>
 			<groupId>de.uniluebeck.itm</groupId>
 			<artifactId>tr.rs-persistence</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>de.uniluebeck.itm</groupId>
-			<artifactId>tr.snaa-api</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>de.uniluebeck.itm</groupId>
-			<artifactId>tr.wsn-api</artifactId>
 		</dependency>
 		<dependency>
 			<groupId>de.uniluebeck.itm</groupId>
@@ -94,11 +87,6 @@
 		<dependency>
 			<groupId>org.mockito</groupId>
 			<artifactId>mockito-all</artifactId>
-			<scope>test</scope>
-		</dependency>
-		<dependency>
-			<groupId>de.uniluebeck.itm</groupId>
-			<artifactId>tr.scripting-client</artifactId>
 			<scope>test</scope>
 		</dependency>
 

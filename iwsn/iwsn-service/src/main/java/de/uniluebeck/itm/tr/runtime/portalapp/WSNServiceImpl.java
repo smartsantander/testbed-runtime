@@ -30,6 +30,8 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import de.itm.uniluebeck.tr.wiseml.WiseMLHelper;
 import de.uniluebeck.itm.netty.handlerstack.HandlerFactoryRegistry;
 import de.uniluebeck.itm.netty.handlerstack.protocolcollection.ProtocolCollection;
+import de.uniluebeck.itm.tr.iwsn.common.DeliveryManager;
+import de.uniluebeck.itm.tr.iwsn.common.WSNPreconditions;
 import de.uniluebeck.itm.tr.runtime.wsnapp.UnknownNodeUrnsException;
 import de.uniluebeck.itm.tr.runtime.wsnapp.WSNApp;
 import de.uniluebeck.itm.tr.runtime.wsnapp.WSNAppMessages;
@@ -41,11 +43,8 @@ import eu.wisebed.api.wsn.ChannelHandlerConfiguration;
 import eu.wisebed.api.wsn.ChannelHandlerDescription;
 import eu.wisebed.api.wsn.Program;
 import eu.wisebed.api.wsn.WSN;
-import eu.wisebed.ns.wiseml._1.Wiseml;
-import eu.wisebed.testbed.api.wsn.Constants;
-import eu.wisebed.testbed.api.wsn.WSNPreconditions;
-import eu.wisebed.testbed.api.wsn.WSNServiceHelper;
-import eu.wisebed.testbed.api.wsn.deliverymanager.DeliveryManager;
+import eu.wisebed.wiseml.Wiseml;
+import eu.wisebed.api.WisebedServiceHelper;
 import org.jboss.netty.buffer.ChannelBuffer;
 import org.jboss.netty.buffer.ChannelBuffers;
 import org.slf4j.Logger;
@@ -66,9 +65,9 @@ import static com.google.common.collect.Lists.newArrayList;
 
 @WebService(
 		serviceName = "WSNService",
-		targetNamespace = Constants.NAMESPACE_WSN_SERVICE,
+		targetNamespace = "urn:WSNService",
 		portName = "WSNPort",
-		endpointInterface = Constants.ENDPOINT_INTERFACE_WSN_SERVICE
+		endpointInterface = "eu.wisebed.api.wsn.WSN"
 )
 public class WSNServiceImpl implements WSNService {
 
@@ -430,7 +429,7 @@ public class WSNServiceImpl implements WSNService {
 
 	@Override
 	public String getVersion() {
-		return Constants.VERSION;
+		return "2.3";
 	}
 
 	@Override
@@ -633,16 +632,16 @@ public class WSNServiceImpl implements WSNService {
 	}
 
 	@Override
-	public String resetNodes(@WebParam(name = "nodes", targetNamespace = "") final List<String> nodeIds) {
+	public String resetNodes(@WebParam(name = "nodes", targetNamespace = "") final List<String> nodeUrns) {
 
-		preconditions.checkResetNodesArguments(nodeIds);
+		preconditions.checkResetNodesArguments(nodeUrns);
 
-		log.debug("WSNServiceImpl.resetNodes");
+		log.debug("WSNServiceImpl.resetNodes({})", nodeUrns);
 
 		final String requestId = secureIdGenerator.getNextId();
 
 		try {
-			wsnApp.resetNodes(new HashSet<String>(nodeIds), new WSNApp.Callback() {
+			wsnApp.resetNodes(new HashSet<String>(nodeUrns), new WSNApp.Callback() {
 				@Override
 				public void receivedRequestStatus(WSNAppMessages.RequestStatus requestStatus) {
 					deliveryManager.receiveStatus(TypeConverter.convert(requestStatus, requestId));
@@ -650,7 +649,7 @@ public class WSNServiceImpl implements WSNService {
 
 				@Override
 				public void failure(Exception e) {
-					deliveryManager.receiveFailureStatusMessages(nodeIds, requestId, e, -1);
+					deliveryManager.receiveFailureStatusMessages(nodeUrns, requestId, e, -1);
 				}
 			}
 			);
@@ -713,7 +712,7 @@ public class WSNServiceImpl implements WSNService {
 
 			log.debug("+++ Adding virtual link from {} to {}", sourceNode, targetNode);
 
-			WSN remoteServiceEndpoint = WSNServiceHelper.getWSNService(remoteServiceInstance);
+			WSN remoteServiceEndpoint = WisebedServiceHelper.getWSNService(remoteServiceInstance);
 
 			//Create a new immutable map with this sourceNode and all existing <targetNode, WSN> mappings
 			ImmutableMap.Builder<String, WSN> targetNodeMapBuilder = ImmutableMap.builder();

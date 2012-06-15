@@ -29,7 +29,7 @@
 	<parent>
         <groupId>de.uniluebeck.itm</groupId>
         <artifactId>tr</artifactId>
-        <version>0.9-SNAPSHOT</version>
+        <version>0.8.2</version>
         <relativePath>../</relativePath>
     </parent>
 
@@ -40,7 +40,6 @@
 
     <modules>
 		<module>assembly</module>
-		<module>experimentation-scripts</module>
 		<module>iwsn-assembly</module>
 		<module>iwsn-federator-assembly</module>
 		<module>federator-assembly</module>

@@ -44,8 +44,7 @@ import de.uniluebeck.itm.wsn.deviceutils.observer.DeviceEvent;
 import de.uniluebeck.itm.wsn.drivers.core.Device;
 import de.uniluebeck.itm.wsn.drivers.core.MacAddress;
 import de.uniluebeck.itm.wsn.drivers.core.exception.ProgramChipMismatchException;
-import de.uniluebeck.itm.wsn.drivers.core.operation.OperationCallback;
-import de.uniluebeck.itm.wsn.drivers.core.operation.OperationCallbackAdapter;
+import de.uniluebeck.itm.wsn.drivers.core.operation.OperationAdapter;
 import de.uniluebeck.itm.wsn.drivers.factories.DeviceFactory;
 import de.uniluebeck.itm.wsn.drivers.factories.DeviceFactoryImpl;
 import de.uniluebeck.itm.wsn.drivers.factories.DeviceType;
@@ -263,7 +262,7 @@ public class WSNDeviceAppConnectorImpl extends ListenerManagerImpl<WSNDeviceAppC
 
 			if (isMockDevice || hasSerialInterface) {
 
-				if (tryToConnect(nodeType, nodeSerialInterface, nodeConfiguration)) {
+				if (!tryToConnect(nodeType, nodeSerialInterface, nodeConfiguration)) {
 					log.warn("{} => Unable to connect to {} device at {}. Retrying in 30 seconds.",
 							new Object[]{nodeUrn, nodeType, nodeSerialInterface}
 					);
@@ -473,7 +472,7 @@ public class WSNDeviceAppConnectorImpl extends ListenerManagerImpl<WSNDeviceAppC
 				deviceLock.lock();
 				try {
 					device.program(program.getProgram().toByteArray(), configuration.getTimeoutFlashMillis(),
-							new OperationCallback<Void>() {
+							new OperationAdapter<Void>() {
 
 								private int lastProgress = -1;
 
@@ -551,11 +550,55 @@ public class WSNDeviceAppConnectorImpl extends ListenerManagerImpl<WSNDeviceAppC
 	@Override
 	public void isNodeAlive(final Callback listener) {
 
-		// TODO integrate timeoutCheckAlive as soon as next wsn-device-drivers version including an isNodeAlive() method is ready
-
 		log.debug("{} => WSNDeviceAppConnectorImpl.isNodeAlive()", configuration.getNodeUrn());
 
-		// to the best of our knowledge, a node is alive if we're connected to it
+		if (isConnected()) {
+
+			deviceLock.lock();
+			try {
+				device.isNodeAlive(configuration.getTimeoutCheckAliveMillis(), new OperationAdapter<Boolean>() {
+
+					@Override
+					public void onExecute() {
+						resetCount = (resetCount % Integer.MAX_VALUE) == 0 ? 0 : resetCount++;
+					}
+
+					@Override
+					public void onSuccess(final Boolean result) {
+						log.debug("{} => Done checking node alive (result={}).", configuration.getNodeUrn(), result);
+						listener.success(null);
+					}
+
+					@Override
+					public void onCancel() {
+						listener.failure((byte) -1, "Operation was cancelled.".getBytes());
+					}
+
+					@Override
+					public void onFailure(final Throwable throwable) {
+						String msg = "Failed checking if node is alive. Reason: " + throwable;
+						log.warn("{} => resetNode(): {}", configuration.getNodeUrn(), msg);
+						listener.failure((byte) -1, msg.getBytes());
+					}
+				}
+				);
+			} finally {
+				deviceLock.unlock();
+			}
+
+		} else {
+
+			String msg = "Failed checking if node is alive. Reason: Device is not connected.";
+			log.warn("{} => {}", configuration.getNodeUrn(), msg);
+			listener.failure((byte) 0, msg.getBytes());
+		}
+	}
+
+	@Override
+	public void isNodeAliveSm(final Callback listener) {
+
+		log.debug("{} => WSNDeviceAppConnectorImpl.isNodeAliveSm()", configuration.getNodeUrn());
+
 		if (isConnected()) {
 			listener.success(null);
 		} else {
@@ -572,7 +615,7 @@ public class WSNDeviceAppConnectorImpl extends ListenerManagerImpl<WSNDeviceAppC
 
 			deviceLock.lock();
 			try {
-				device.reset(configuration.getTimeoutResetMillis(), new OperationCallbackAdapter<Void>() {
+				device.reset(configuration.getTimeoutResetMillis(), new OperationAdapter<Void>() {
 
 					@Override
 					public void onExecute() {
@@ -686,6 +729,33 @@ public class WSNDeviceAppConnectorImpl extends ListenerManagerImpl<WSNDeviceAppC
 	}
 
 	@Override
+	public void setDefaultChannelPipeline(@Nullable final Callback callback) {
+
+		try {
+
+			List<Tuple<String, ChannelHandler>> innerPipelineHandlers = createDefaultInnerPipelineHandlers();
+			setPipeline(deviceChannel.getPipeline(), createPipelineHandlers(innerPipelineHandlers));
+
+			log.debug("{} => Channel pipeline now set to: {}", configuration.getNodeUrn(), innerPipelineHandlers);
+
+			if (callback != null) {
+				callback.success(null);
+			}
+
+		} catch (Exception e) {
+
+			log.warn("Exception while setting default channel pipeline: {}", e);
+
+			if (callback != null) {
+				callback.failure(
+						(byte) -1,
+						("Exception while setting channel pipeline: " + e.getMessage()).getBytes()
+				);
+			}
+		}
+	}
+
+	@Override
 	public void setChannelPipeline(final List<Tuple<String, Multimap<String, String>>> channelHandlerConfigurations,
 								   final Callback callback) {
 
@@ -702,6 +772,8 @@ public class WSNDeviceAppConnectorImpl extends ListenerManagerImpl<WSNDeviceAppC
 				innerPipelineHandlers = handlerFactoryRegistry.create(channelHandlerConfigurations);
 				setPipeline(deviceChannel.getPipeline(), createPipelineHandlers(innerPipelineHandlers));
 
+				log.debug("{} => Channel pipeline now set to: {}", configuration.getNodeUrn(), innerPipelineHandlers);
+
 				callback.success(null);
 
 			} catch (Exception e) {
@@ -717,13 +789,8 @@ public class WSNDeviceAppConnectorImpl extends ListenerManagerImpl<WSNDeviceAppC
 
 				log.warn("{} => Resetting channel pipeline to default pipeline.", configuration.getNodeUrn());
 
-				innerPipelineHandlers = createDefaultInnerPipelineHandlers();
-				setPipeline(deviceChannel.getPipeline(), createPipelineHandlers(innerPipelineHandlers));
+				setDefaultChannelPipeline(null);
 			}
-
-			log.debug("{} => Channel pipeline now set to: {}",
-					configuration.getNodeUrn(), innerPipelineHandlers
-			);
 
 		} else {
 			callback.failure((byte) -1, "Node is not connected.".getBytes());
@@ -782,7 +849,12 @@ public class WSNDeviceAppConnectorImpl extends ListenerManagerImpl<WSNDeviceAppC
 		try {
 
 			DeviceFactory deviceFactory = new DeviceFactoryImpl();
-			device = deviceFactory.create(deviceDriverExecutorService, deviceType, deviceConfiguration);
+			try {
+				device = deviceFactory.create(deviceDriverExecutorService, deviceType, deviceConfiguration);
+			} catch (Exception e) {
+				log.error("{}", e);
+				throw new RuntimeException(e);
+			}
 
 			try {
 

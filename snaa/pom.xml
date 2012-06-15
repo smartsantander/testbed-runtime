@@ -29,7 +29,7 @@
 	<parent>
         <groupId>de.uniluebeck.itm</groupId>
         <artifactId>tr</artifactId>
-        <version>0.9-SNAPSHOT</version>
+        <version>0.8.2</version>
         <relativePath>../</relativePath>
     </parent>
 
@@ -39,7 +39,7 @@
     <name>TR :: SNAA</name>
 
     <modules>
-		<module>snaa-api</module>
+		<module>snaa-common</module>
 		<module>snaa-cmdline-client</module>
 		<module>snaa-cmdline-server</module>
 		<module>snaa-dummy</module>

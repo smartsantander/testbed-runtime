@@ -24,6 +24,7 @@
 package de.uniluebeck.itm.gtr.messaging;
 
 import com.google.protobuf.ByteString;
+import com.google.protobuf.UninitializedMessageException;
 import de.uniluebeck.itm.gtr.connection.Connection;
 import de.uniluebeck.itm.gtr.connection.ServerConnection;
 import org.slf4j.Logger;
@@ -38,6 +39,7 @@ public class MessageTools {
 
 	public static void sendMessage(Messages.Msg msg, OutputStream out) throws Exception {
 		msg.writeDelimitedTo(out);
+		out.flush();
 	}
 
 	public static Messages.Msg buildMessage(String from, String to, String app, String replyWith, String replyTo,
@@ -76,6 +78,7 @@ public class MessageTools {
 		}
 
 		public void run() {
+			log.trace("Starting MessageReader for remote host {} on server connection {}", connection, serverConnection);
 			readAndPostMessages();
 		}
 
@@ -89,9 +92,17 @@ public class MessageTools {
 
 					Messages.Msg.Builder builder = Messages.Msg.newBuilder();
 					builder.mergeDelimitedFrom(in);
-					Messages.Msg msg = builder.build();
-					log.trace("Received message: {}", msg);
-					messageCallback.receivedMessage(serverConnection, connection, msg);
+					try {
+
+						Messages.Msg msg = builder.build();
+						messageCallback.receivedMessage(serverConnection, connection, msg);
+
+					} catch (UninitializedMessageException e) {
+
+						log.debug("Received uninitialized message. That usually happens when the connection was broken.");
+						connection.disconnect();
+						return;
+					}
 
 				}
 
