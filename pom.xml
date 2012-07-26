@@ -29,21 +29,45 @@
 	<groupId>de.uniluebeck.itm</groupId>
 	<artifactId>tr</artifactId>
 	<packaging>pom</packaging>
-	<version>0.8.2</version>
+	<version>0.8.3</version>
 	<name>TR</name>
 
 	<modules>
 
-		<module>assemblies/</module>
-		<module>rs/</module>
-		<module>iwsn/</module>
-		<module>snaa/</module>
+		<module>iwsn-common</module>
+        <module>iwsn-csv2config</module>
+        <module>iwsn-federator</module>
+        <module>iwsn-server</module>
+		<module>rs-server</module>
+		<module>snaa-server</module>
 
 		<module>federator-utils</module>
 		<module>wiseml</module>
 		<module>wiseml-merger</module>
 
 	</modules>
+
+	<profiles>
+		<profile>
+			<id>assemblies</id>
+			<activation>
+				<activeByDefault>false</activeByDefault>
+				<property>
+					<name>performRelease</name>
+					<value>true</value>
+				</property>
+			</activation>
+			<modules>
+				<module>assemblies</module>
+			</modules>
+		</profile>
+		<profile>
+			<id>release-profile</id>
+			<modules>
+				<module>assemblies</module>
+			</modules>
+		</profile>
+	</profiles>
 
 	<dependencyManagement>
 		<dependencies>
@@ -56,22 +80,7 @@
 			</dependency>
 			<dependency>
 				<groupId>de.uniluebeck.itm</groupId>
-				<artifactId>tr.snaa-common</artifactId>
-				<version>${project.version}</version>
-			</dependency>
-			<dependency>
-				<groupId>de.uniluebeck.itm</groupId>
-				<artifactId>tr.rs-persistence</artifactId>
-				<version>${project.version}</version>
-			</dependency>
-			<dependency>
-				<groupId>de.uniluebeck.itm</groupId>
-				<artifactId>tr.rs-cmdline</artifactId>
-				<version>${project.version}</version>
-			</dependency>
-			<dependency>
-				<groupId>de.uniluebeck.itm</groupId>
-				<artifactId>tr.rs-cmdline</artifactId>
+				<artifactId>tr.rs-server</artifactId>
 				<classifier>onejar</classifier>
 				<version>${project.version}</version>
 			</dependency>
@@ -87,88 +96,18 @@
 			</dependency>
 			<dependency>
 				<groupId>de.uniluebeck.itm</groupId>
-				<artifactId>tr.rs-dummy</artifactId>
+				<artifactId>tr.iwsn-server</artifactId>
 				<version>${project.version}</version>
 			</dependency>
 			<dependency>
 				<groupId>de.uniluebeck.itm</groupId>
-				<artifactId>tr.rs-singleurnprefix</artifactId>
-				<version>${project.version}</version>
-			</dependency>
-			<dependency>
-				<groupId>de.uniluebeck.itm</groupId>
-				<artifactId>tr.rs-federator</artifactId>
-				<version>${project.version}</version>
-			</dependency>
-			<dependency>
-				<groupId>de.uniluebeck.itm</groupId>
-				<artifactId>tr.overlay</artifactId>
-				<version>${project.version}</version>
-			</dependency>
-			<dependency>
-				<groupId>de.uniluebeck.itm</groupId>
-				<artifactId>tr.iwsn-cmdline</artifactId>
-				<version>${project.version}</version>
-			</dependency>
-			<dependency>
-				<groupId>de.uniluebeck.itm</groupId>
-				<artifactId>tr.iwsn-cmdline</artifactId>
+				<artifactId>tr.iwsn-server</artifactId>
 				<classifier>onejar</classifier>
 				<version>${project.version}</version>
 			</dependency>
 			<dependency>
 				<groupId>de.uniluebeck.itm</groupId>
-				<artifactId>tr.iwsn-service</artifactId>
-				<version>${project.version}</version>
-			</dependency>
-			<dependency>
-				<groupId>de.uniluebeck.itm</groupId>
-				<artifactId>tr.overlay-stats</artifactId>
-				<version>${project.version}</version>
-			</dependency>
-			<dependency>
-				<groupId>de.uniluebeck.itm</groupId>
-				<artifactId>tr.iwsn-deviceapp</artifactId>
-				<version>${project.version}</version>
-			</dependency>
-			<dependency>
-				<groupId>de.uniluebeck.itm</groupId>
-				<artifactId>tr.snaa-cmdline-client</artifactId>
-				<version>${project.version}</version>
-			</dependency>
-			<dependency>
-				<groupId>de.uniluebeck.itm</groupId>
-				<artifactId>tr.snaa-cmdline-server</artifactId>
-				<version>${project.version}</version>
-			</dependency>
-			<dependency>
-				<groupId>de.uniluebeck.itm</groupId>
-				<artifactId>tr.snaa-dummy</artifactId>
-				<version>${project.version}</version>
-			</dependency>
-			<dependency>
-				<groupId>de.uniluebeck.itm</groupId>
-				<artifactId>tr.snaa-federator</artifactId>
-				<version>${project.version}</version>
-			</dependency>
-			<dependency>
-				<groupId>de.uniluebeck.itm</groupId>
-				<artifactId>tr.snaa-wisebed</artifactId>
-				<version>${project.version}</version>
-			</dependency>
-			<dependency>
-				<groupId>de.uniluebeck.itm</groupId>
-				<artifactId>tr.snaa-shibboleth</artifactId>
-				<version>${project.version}</version>
-			</dependency>
-			<dependency>
-				<groupId>de.uniluebeck.itm</groupId>
-				<artifactId>tr.snaa-jaaslogin</artifactId>
-				<version>${project.version}</version>
-			</dependency>
-			<dependency>
-				<groupId>de.uniluebeck.itm</groupId>
-				<artifactId>tr.overlay-socketconnector</artifactId>
+				<artifactId>tr.snaa-server</artifactId>
 				<version>${project.version}</version>
 			</dependency>
 			<dependency>
@@ -203,32 +142,27 @@
 			<dependency>
 				<groupId>de.uniluebeck.itm.wsn-device-utils</groupId>
 				<artifactId>wsn-device-utils</artifactId>
-				<version>1.1</version>
+				<version>1.1.2</version>
 			</dependency>
 			<dependency>
 				<groupId>de.uniluebeck.itm</groupId>
 				<artifactId>wsn-device-drivers-factories</artifactId>
-				<version>1.1</version>
-			</dependency>
-			<dependency>
-				<groupId>de.uniluebeck.itm</groupId>
-				<artifactId>wsn-device-drivers-core</artifactId>
-				<version>1.1</version>
+				<version>1.1.2</version>
 			</dependency>
 			<dependency>
 				<groupId>de.uniluebeck.itm.netty-iostream</groupId>
 				<artifactId>netty-iostream</artifactId>
-				<version>0.5</version>
+				<version>0.6</version>
 			</dependency>
 			<dependency>
 				<groupId>de.uniluebeck.itm.netty.handlerstack</groupId>
 				<artifactId>protocol-collection</artifactId>
-				<version>1.4</version>
+				<version>1.5</version>
 			</dependency>
 			<dependency>
 				<groupId>de.uniluebeck.itm.netty.handlerstack</groupId>
 				<artifactId>factory</artifactId>
-				<version>1.4</version>
+				<version>1.5</version>
 			</dependency>
 
 			<!-- 3rd party libraries -->
@@ -479,6 +413,11 @@
 					<artifactId>maven-javadoc-plugin</artifactId>
 					<version>2.8</version>
 				</plugin>
+				<plugin>
+					<groupId>com.googlecode.maven-overview-plugin</groupId>
+					<artifactId>maven-overview-plugin</artifactId>
+					<version>RELEASE</version>
+				</plugin>
 			</plugins>
 		</pluginManagement>
 		<plugins>
@@ -518,6 +457,7 @@
 				<artifactId>maven-release-plugin</artifactId>
 				<version>2.2.2</version>
 				<configuration>
+					<arguments>-P assemblies</arguments>
 					<tagNameFormat>v@{project.version}</tagNameFormat>
 				</configuration>
 			</plugin>
